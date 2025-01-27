@@ -22,6 +22,7 @@ def convert_to_yastn(Dict):
     T_real=numpy.array(Dict['T_real'], order='F');
     T_imag=numpy.array(Dict['T_imag'], order='F');
     T=T_real+1j*T_imag;
+    assert len(numpy.shape(T))==1
     
     even_dims=numpy.array(Dict['even_dims']);
     odd_dims=numpy.array(Dict['odd_dims']);
