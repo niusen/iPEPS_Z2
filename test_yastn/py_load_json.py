@@ -19,12 +19,18 @@ with open('SU_iPESS_Z2_csl_D4.JSON') as f:
 
 
 def convert_to_yastn(Dict):
-    T_real=numpy.array(Dict['T_real']);
-    T_imag=numpy.array(Dict['T_imag']);
+    T_real=numpy.array(Dict['T_real'], order='F');
+    T_imag=numpy.array(Dict['T_imag'], order='F');
     T=T_real+1j*T_imag;
     
-    even_dims=Dict['even_dims'];
-    odd_dims=Dict['odd_dims'];
+    even_dims=numpy.array(Dict['even_dims']);
+    odd_dims=numpy.array(Dict['odd_dims']);
+    dims=even_dims+odd_dims;
+    if len(dims)==3:
+        T=numpy.reshape(T,(dims[0],dims[1],dims[2]),order='F')
+    elif len(dims)==4:
+        T=numpy.reshape(T,(dims[0],dims[1],dims[2],dims[3]),order='F')
+    
     dual=Dict['dual'];
     if len(dual)==3:
         config_Z2 = yastn.make_config(sym='Z2',fermionic=True, **config_kwargs)
@@ -91,6 +97,7 @@ def convert_to_yastn(Dict):
 
                         if numpy.mod(c1+c2+c3+c4,2)==0:
                             tt.set_block(ts=(c1, c2, c3, c4), val=T_, Ds=(len(range1), len(range2), len(range3), len(range4)))
+    return tt
 
 
 
@@ -106,7 +113,16 @@ for cx in range(0,6) :
     for cy in range(0,6):
         tm=T_set[str(cx+1)+','+str(cy+1)];
         bm=B_set[str(cx+1)+','+str(cy+1)];
-        convert_to_yastn(bm)
+        bm=convert_to_yastn(bm)
+        tm=convert_to_yastn(tm)
+
+        if cx==3-1:
+            if cy==5-1:
+                bm=bm.to_dense()
+                print(bm[1-1,3-1,3-1])
+                
+        # yastn.Tensor.save_to_dict(a) 
+        # yastn.load_from_dict()
 
         
 
