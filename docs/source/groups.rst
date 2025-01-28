@@ -1,7 +1,0 @@
-Groups
-======
-
-.. toctree::
-    :glob:
-
-    groups/*
