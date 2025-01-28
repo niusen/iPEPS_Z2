@@ -1,168 +1,206 @@
+import numpy
 import torch
+import json
 from collections import OrderedDict
 import json
-import math
-import config as cfg
 import yastn
 
 class IPESS_TRIANGLE():
-    def __init__(self, B_set, T_set,
-                 peps_args=cfg.peps_args, global_args=cfg.global_args):
+    def __init__(self, B_set, T_set, global_args):
+
+        self.B_set= B_set;
+        self.T_set= T_set;
+        self.global_args=global_args;
+        self.Lx=global_args['Lx']
+        self.Ly=global_args['Ly']
+        
+    def require_grad(self,require):
+        for cx in range(0,self.Lx):
+            for cy in range(0,self.Ly):
+                self.B_set[str(cx)+','+str(cy)].requires_grad_(requires_grad=require)
+                self.T_set[str(cx)+','+str(cy)].requires_grad_(requires_grad=require)
+
+    def to_device(self,device_):
+        for cx in range(0,self.Lx):
+            for cy in range(0,self.Ly):
+                self.B_set[str(cx)+','+str(cy)].to(device_)
+                self.T_set[str(cx)+','+str(cy)].to(device_)
+        
+    def normalize(self):
+        for cx in range(0,self.Lx):
+            for cy in range(0,self.Ly):
+                self.B_set[str(cx)+','+str(cy)]=self.B_set[str(cx)+','+str(cy)]/(yastn.linalg.norm(self.B_set[str(cx)+','+str(cy)]))
+                self.T_set[str(cx)+','+str(cy)]=self.T_set[str(cx)+','+str(cy)]/(yastn.linalg.norm(self.T_set[str(cx)+','+str(cy)]))
+
+    def build_double_layer_iPESS(self):
+        B_double_set=OrderedDict()
+        T_double_set=OrderedDict()
 
 
-        self.B_set= B_set
-        self.T_set= T_set
-        sites = self.build_onsite_tensors()
+def load_triangle_iPESS(filenm,config_kwargs):
+    with open(filenm+'.JSON') as f:
+        data = json.load(f)
+        # print(data)
 
+    def convert_to_yastn(Dict):
+        T_real=numpy.array(Dict['T_real'], order='F');
+        T_imag=numpy.array(Dict['T_imag'], order='F');
+        T=T_real+1j*T_imag;
+        assert len(numpy.shape(T))==1
+        
+        even_dims=numpy.array(Dict['even_dims']);
+        odd_dims=numpy.array(Dict['odd_dims']);
+        dims=even_dims+odd_dims;
+        if len(dims)==3:
+            T=numpy.reshape(T,(dims[0],dims[1],dims[2]),order='F')
+        elif len(dims)==4:
+            T=numpy.reshape(T,(dims[0],dims[1],dims[2],dims[3]),order='F')
+        
+        dual=Dict['dual'];
+        if len(dual)==3:
+            config_Z2 = yastn.make_config(sym='Z2',fermionic=True, **config_kwargs)
+            leg1 = yastn.Leg(config_Z2, s=2*(0.5-dual[0]), t=(0, 1), D=(even_dims[0], odd_dims[0]))
+            leg2 = yastn.Leg(config_Z2, s=2*(0.5-dual[1]), t=(0, 1), D=(even_dims[1], odd_dims[1]))
+            leg3 = yastn.Leg(config_Z2, s=2*(0.5-dual[2]), t=(0, 1), D=(even_dims[2], odd_dims[2]))
+            tt = yastn.zeros(config=config_Z2, legs=[leg1, leg2, leg3])
 
+            for c1 in range(0,2):
+                if c1==0:
+                    range1=range(0,even_dims[0])
+                else:
+                    range1=range(even_dims[0],even_dims[0]+odd_dims[0])
+                for c2 in range(0,2):
+                    if c2==0:
+                        range2=range(0,even_dims[1])
+                    else:
+                        range2=range(even_dims[1],even_dims[1]+odd_dims[1])
+                    for c3 in range(0,2):
+                        if c3==0:
+                            range3=range(0,even_dims[2])
+                        else:
+                            range3=range(even_dims[2],even_dims[2]+odd_dims[2])
 
+                        T_=T[range1,:,:]
+                        T_=T_[:,range2,:]
+                        T_=T_[:,:,range3]
 
-    def add_noise(self, noise):
-        r"""
-        :param noise: magnitude of noise
-        :type noise: float
+                        if numpy.mod(c1+c2+c3,2)==0:
+                            tt.set_block(ts=(c1, c2, c3), val=T_, Ds=(len(range1), len(range2), len(range3)))
+        elif len(dual)==4:
+            config_Z2 = yastn.make_config(sym='Z2',fermionic=True, **config_kwargs)
+            leg1 = yastn.Leg(config_Z2, s=2*(0.5-dual[0]), t=(0, 1), D=(even_dims[0], odd_dims[0]))
+            leg2 = yastn.Leg(config_Z2, s=2*(0.5-dual[1]), t=(0, 1), D=(even_dims[1], odd_dims[1]))
+            leg3 = yastn.Leg(config_Z2, s=2*(0.5-dual[2]), t=(0, 1), D=(even_dims[2], odd_dims[2]))
+            leg4 = yastn.Leg(config_Z2, s=2*(0.5-dual[3]), t=(0, 1), D=(even_dims[3], odd_dims[3]))
+            tt = yastn.zeros(config=config_Z2, legs=[leg1, leg2, leg3, leg4])
 
-        Add uniform random noise to iPESS tensors.
-        """
-        for k in self.ipess_tensors:
-            rand_t= torch.rand( self.ipess_tensors[k].size(), dtype=self.dtype, device=self.device)
-            self.ipess_tensors[k]= self.ipess_tensors[k] + noise * (rand_t-1.0)
-        self.sites = self.build_onsite_tensors()
+            for c1 in range(0,2):
+                if c1==0:
+                    range1=range(0,even_dims[0])
+                else:
+                    range1=range(even_dims[0],even_dims[0]+odd_dims[0])
+                for c2 in range(0,2):
+                    if c2==0:
+                        range2=range(0,even_dims[1])
+                    else:
+                        range2=range(even_dims[1],even_dims[1]+odd_dims[1])
+                    for c3 in range(0,2):
+                        if c3==0:
+                            range3=range(0,even_dims[2])
+                        else:
+                            range3=range(even_dims[2],even_dims[2]+odd_dims[2])
+                        for c4 in range(0,2):
+                            if c4==0:
+                                range4=range(0,even_dims[3])
+                            else:
+                                range4=range(even_dims[3],even_dims[3]+odd_dims[3])
 
-    def get_physical_dim(self):
-        assert self.ipess_tensors["B_a"].size(0)==self.ipess_tensors["B_b"].size(0) and \
-            self.ipess_tensors["B_b"].size(0)==self.ipess_tensors["B_c"].size(0),\
-            "Different physical dimensions across iPESS bond tensors"
-        return self.ipess_tensors["B_a"].size(0)
+                            T_=T[range1,:,:,:]
+                            T_=T_[:,range2,:,:]
+                            T_=T_[:,:,range3,:]
+                            T_=T_[:,:,:,range4]
 
-    def get_aux_bond_dims(self):
-        aux_bond_dims= set()
-        aux_bond_dims= aux_bond_dims | set(self.ipess_tensors["T_u"].size()) \
-            | set(self.ipess_tensors["T_d"].size())
-        assert len(aux_bond_dims)==1,"iPESS does not have a uniform aux bond dimension"
-        return list(aux_bond_dims)[0]
+                            if numpy.mod(c1+c2+c3+c4,2)==0:
+                                tt.set_block(ts=(c1, c2, c3, c4), val=T_, Ds=(len(range1), len(range2), len(range3), len(range4)))
+        return tt
 
-    def write_to_file(self, outputfile, aux_seq=None, tol=1.0e-14, normalize=False):
-        r"""
-        See :meth:`write_ipess_kagome_generic`.
-        """
-        write_ipess_kagome_generic(self, outputfile, tol=tol, normalize=normalize)
-
-    def extend_bond_dim(self, new_d, peps_args=cfg.peps_args, global_args=cfg.global_args):
-        r"""
-        :param new_d: new enlarged auxiliary bond dimension
-        :type state: IPESS_KAGOME_GENERIC
-        :type new_d: int
-        :return: wavefunction with enlarged auxiliary bond dimensions
-        :rtype: IPESS_KAGOME_GENERIC
-
-        Take IPESS_KAGOME_GENERIC and enlarge all auxiliary bond dimensions of ``T_u``, ``T_d``, 
-        ``B_a``, ``B_b``, and ``B_c`` tensors to the new size ``new_d``.
-        """
-        ad= self.get_aux_bond_dims()
-        assert new_d>=ad, "Desired dimension is smaller than current aux dimension"
-        new_ipess_tensors= dict()
-        for k in ['T_u','T_d']:
-            new_ipess_tensors[k]= torch.zeros(new_d,new_d,new_d, dtype=self.dtype, device=self.device)
-            new_ipess_tensors[k][:ad,:ad,:ad]= self.ipess_tensors[k]
-        for k in ['B_a','B_b', 'B_c']:
-            new_ipess_tensors[k]= torch.zeros(self.ipess_tensors[k].size(0),new_d,new_d,\
-                dtype=self.dtype, device=self.device)
-            new_ipess_tensors[k][:,:ad,:ad]= self.ipess_tensors[k]
-
-        new_state= self.__class__(new_ipess_tensors,\
-            peps_args=peps_args, global_args=global_args)
-
-        return new_state
-
-def read_ipess_triangle(jsonfile, peps_args=cfg.peps_args, global_args=cfg.global_args):
-    r"""
-    :param jsonfile: input file describing iPEPS in JSON format`
-    :param peps_args: ipeps configuration
-    :param global_args: global configuration
-    :type jsonfile: str or Path object
-    :type peps_args: PEPSARGS
-    :type global_args: GLOBALARGS
-    :return: wavefunction
-    :rtype: IPESS_KAGOME_GENERIC
-
-    Read state from file.
-    """
-    dtype = global_args.torch_dtype
-
-    with open(jsonfile) as j:
-        data = json.load(j)
-
-    Bm_set=data['Bm_set']
-    Tm_set=data['Tm_set']
-
-    Lx=global_args.Lx;
-    Ly=global_args.Ly;
-
-    B_set=OrderedDict()
-    T_set=OrderedDict()
+    Lx=config_kwargs['Lx'];
+    Ly=config_kwargs['Ly'];
+    T_set=(data['T_set'])
+    B_set=(data['B_set'])
+    Bm_set=OrderedDict()
+    Tm_set=OrderedDict()
     for cx in range(0,Lx):
         for cy in range(0,Ly):
-            tm=Tm_set[str(cx+1)+','+str(cy+1)];
-            bm=Bm_set[str(cx+1)+','+str(cy+1)];
+            tm=T_set[str(cx+1)+','+str(cy+1)];
+            bm=B_set[str(cx+1)+','+str(cy+1)];
             bm=convert_to_yastn(bm)
             tm=convert_to_yastn(tm)
             
-            bm=yastn.Tensor.save_to_dict(bm)
-            tm=yastn.Tensor.save_to_dict(tm)
-
-            bm['_d']=(numpy.real(bm['_d'])).tolist()+(numpy.imag(bm['_d'])).tolist();
-            tm['_d']=(numpy.real(bm['_d'])).tolist()+(numpy.imag(tm['_d'])).tolist();
+            # bm=yastn.Tensor.save_to_dict(bm)
+            # tm=yastn.Tensor.save_to_dict(tm)
+            # bm['_d']=(numpy.real(bm['_d'])).tolist()+(numpy.imag(bm['_d'])).tolist();
+            # tm['_d']=(numpy.real(bm['_d'])).tolist()+(numpy.imag(tm['_d'])).tolist();
 
             Bm_set.update({str(cx)+','+str(cy):bm})
             Tm_set.update({str(cx)+','+str(cy):tm})
 
+            # yastn.load_from_dict()
+    return Bm_set,Tm_set
 
-    return state
+def save_triangle_iPESS(Bm_set, Tm_set, filenm, config_kwargs):
+    def yastn_to_dict(TT):
+        sigs=TT.s;
+        dual=(0.5-numpy.array(sigs)/2).astype(int).tolist();
+        Rank=len(sigs);
+        legs=TT.get_legs();
+    
+        if Rank==3:
+            even_dims=[legs[0].D[0], legs[1].D[0], legs[2].D[0]]
+            odd_dims=[legs[0].D[1], legs[1].D[1], legs[2].D[1]]
+        elif Rank==4:
+            even_dims=[legs[0].D[0], legs[1].D[0], legs[2].D[0], legs[3].D[0]]
+            odd_dims=[legs[0].D[1], legs[1].D[1], legs[2].D[1], legs[3].D[1]]
+        TT_dense=numpy.array(TT.to_dense().to('cpu'))
+        TT_dense=numpy.reshape(TT_dense,-1,order='F');
+        T_real=numpy.real(TT_dense);
+        T_imag=numpy.imag(TT_dense);
+        Dict={'T_real':T_real.tolist(),'T_imag':T_imag.tolist(),'even_dims':even_dims,'odd_dims':odd_dims,'dual':dual}
+        return Dict
 
-def write_ipess_triangle(state, outputfile, tol=1.0e-14, normalize=False):
-    r"""
-    :param state: wavefunction to write out in json format
-    :param outputfile: target file
-    :param tol: minimum magnitude of tensor elements which are written out
-    :param normalize: if True, on-site tensors are normalized before writing
-    :type state: IPESS_KAGOME_GENERIC
-    :type ouputfile: str or Path object
-    :type tol: float
-    :type normalize: bool
+    B_set=OrderedDict()
+    T_set=OrderedDict()
+    Lx=config_kwargs['Lx'];
+    Ly=config_kwargs['Ly'];
 
-    Write state into file.
-    """
-    #TODO implement cutoff on elements with magnitude below tol
-    json_state = dict({"lX": state.lX, "lY": state.lY, \
-        "ipess_tensors": {}})
+    for cx in range(0,Lx):
+        for cy in range(0,Ly):
+            bm=Bm_set[str(cx)+','+str(cy)]
+            tm=Tm_set[str(cx)+','+str(cy)]
+            bm=yastn_to_dict(bm)
+            tm=yastn_to_dict(tm)
+            
+            B_set.update({str(cx+1)+','+str(cy+1):bm})
+            T_set.update({str(cx+1)+','+str(cy+1):tm})
 
-    # write list of considered elementary tensors
-    for key, t in state.ipess_tensors.items():
-        tmp_t= t/t.abs().max() if normalize else t
-        json_state["ipess_tensors"][key]= serialize_bare_tensor_legacy(tmp_t)
+    with open(filenm+'.json', "w") as f:
+        json.dump({'T_set':T_set,'B_set':B_set}, f)
 
-    with open(outputfile, 'w') as f:
-        json.dump(json_state, f, indent=4, separators=(',', ': '))
+ 
+# # config_kwargs = {"backend": "np"}
+# config_kwargs = {"backend": "torch", "default_dtype": 'complex128', 'default_device': 'cuda', 'Lx':6, 'Ly':6}
+
+# filenm='SU_iPESS_Z2_csl_D4'
+# Bm_set,Tm_set=load_triangle_iPESS(filenm,config_kwargs)
+
+# filenm1='SU_iPESS_Z2_D4'
+# save_triangle_iPESS(Bm_set, Tm_set, filenm1, config_kwargs)
 
 
+# Bm_set2,Tm_set2=load_triangle_iPESS(filenm1,config_kwargs)
 
-
-def build_onsite_tensors(self):
-    r"""
-    :return: elementary unit cell of underlying IPEPS
-    :rtype: dict[tuple(int,int): torch.Tensor]
-
-    Build rank-5 on-site tensor by contracting the iPESS tensors.
-    """
-    A= torch.einsum('iab,uji,jkl,vkc,wld->uvwabcd', self.ipess_tensors['T_u'],
-        self.ipess_tensors['B_c'], self.ipess_tensors['T_d'], self.ipess_tensors['B_b'], \
-        self.ipess_tensors['B_a'])
-    total_phys_dim= self.ipess_tensors['B_a'].size(0)*self.ipess_tensors['B_b'].size(0)\
-        *self.ipess_tensors['B_c'].size(0)
-    A= A.reshape([total_phys_dim]+[self.ipess_tensors['T_u'].size(1), \
-        self.ipess_tensors['T_u'].size(2), self.ipess_tensors['B_b'].size(2), \
-        self.ipess_tensors['B_a'].size(2)])
-    A= A/A.abs().max()
-    sites= {(0, 0): A}
-    return sites
+# #verify save and reload
+# for cx in range(0,6):
+#     for cy in range(0,6):
+#         print(yastn.linalg.norm(Bm_set[str(cx)+','+str(cy)]-Bm_set2[str(cx)+','+str(cy)]));
+#         print(yastn.linalg.norm(Tm_set[str(cx)+','+str(cy)]-Tm_set2[str(cx)+','+str(cy)]));

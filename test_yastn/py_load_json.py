@@ -177,17 +177,22 @@ config_kwargs = {"backend": "torch", "default_dtype": 'complex128', 'default_dev
 filenm='SU_iPESS_Z2_csl_D4'
 Bm_set,Tm_set=load_triangle_iPESS(filenm,config_kwargs)
 
-filenm1='SU_iPESS_Z2_D4'
-save_triangle_iPESS(Bm_set, Tm_set, filenm1, config_kwargs)
+Bm_set['1,1'].requires_grad_(requires_grad=True)
+print(Bm_set['1,1'].requires_grad)
+print(Bm_set['1,2'].requires_grad)
 
 
-Bm_set2,Tm_set2=load_triangle_iPESS(filenm1,config_kwargs)
+# filenm1='SU_iPESS_Z2_D4'
+# save_triangle_iPESS(Bm_set, Tm_set, filenm1, config_kwargs)
 
-#verify save and reload
-for cx in range(0,6):
-    for cy in range(0,6):
-        print(yastn.linalg.norm(Bm_set[str(cx)+','+str(cy)]-Bm_set2[str(cx)+','+str(cy)]));
-        print(yastn.linalg.norm(Tm_set[str(cx)+','+str(cy)]-Tm_set2[str(cx)+','+str(cy)]));
+
+# Bm_set2,Tm_set2=load_triangle_iPESS(filenm1,config_kwargs)
+
+# #verify save and reload
+# for cx in range(0,6):
+#     for cy in range(0,6):
+#         print(yastn.linalg.norm(Bm_set[str(cx)+','+str(cy)]-Bm_set2[str(cx)+','+str(cy)]));
+#         print(yastn.linalg.norm(Tm_set[str(cx)+','+str(cy)]-Tm_set2[str(cx)+','+str(cy)]));
 
 
 
