@@ -23,8 +23,8 @@ class IPESS_TRIANGLE():
     def to_device(self,device_):
         for cx in range(0,self.Lx):
             for cy in range(0,self.Ly):
-                self.B_set[str(cx)+','+str(cy)].to(device_)
-                self.T_set[str(cx)+','+str(cy)].to(device_)
+                self.B_set[str(cx)+','+str(cy)]=self.B_set[str(cx)+','+str(cy)].to(device_)
+                self.T_set[str(cx)+','+str(cy)]=self.T_set[str(cx)+','+str(cy)].to(device_)
         
     def normalize(self):
         for cx in range(0,self.Lx):

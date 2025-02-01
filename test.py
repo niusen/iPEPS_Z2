@@ -24,7 +24,15 @@ state.require_grad(True)
 
 
 
+tt=B_set['1,1']
+print(tt[0,1,1])
+tt1=yastn.swap_gate(tt, (1,1))
+print(tt1[0,1,1])
+tt2=tt.conj()
+print(tt2[0,1,1])
 
+tt=tt.fuse_legs((0,(1,2)), mode='hard')
+tt=tt.fuse_legs((0,(1,2)), mode='meta')
 
 
 
