@@ -15,20 +15,20 @@ class IPESS_TRIANGLE():
         self.Ly=global_args['Ly']
         
     def require_grad(self,require):
-        for cx in range(0,self.Lx):
-            for cy in range(0,self.Ly):
+        for cx in range(1,self.Lx+1):
+            for cy in range(1,self.Ly+1):
                 self.B_set[str(cx)+','+str(cy)].requires_grad_(requires_grad=require)
                 self.T_set[str(cx)+','+str(cy)].requires_grad_(requires_grad=require)
 
     def to_device(self,device_):
-        for cx in range(0,self.Lx):
-            for cy in range(0,self.Ly):
+        for cx in range(1,self.Lx+1):
+            for cy in range(1,self.Ly+1):
                 self.B_set[str(cx)+','+str(cy)]=self.B_set[str(cx)+','+str(cy)].to(device_)
                 self.T_set[str(cx)+','+str(cy)]=self.T_set[str(cx)+','+str(cy)].to(device_)
         
     def normalize(self):
-        for cx in range(0,self.Lx):
-            for cy in range(0,self.Ly):
+        for cx in range(1,self.Lx+1):
+            for cy in range(1,self.Ly+1):
                 self.B_set[str(cx)+','+str(cy)]=self.B_set[str(cx)+','+str(cy)]/(yastn.linalg.norm(self.B_set[str(cx)+','+str(cy)]))
                 self.T_set[str(cx)+','+str(cy)]=self.T_set[str(cx)+','+str(cy)]/(yastn.linalg.norm(self.T_set[str(cx)+','+str(cy)]))
 
@@ -130,10 +130,10 @@ def load_triangle_iPESS(filenm,config_kwargs):
     B_set=(data['B_set'])
     Bm_set=OrderedDict()
     Tm_set=OrderedDict()
-    for cx in range(0,Lx):
-        for cy in range(0,Ly):
-            tm=T_set[str(cx+1)+','+str(cy+1)];
-            bm=B_set[str(cx+1)+','+str(cy+1)];
+    for cx in range(1,Lx+1):
+        for cy in range(1,Ly+1):
+            tm=T_set[str(cx)+','+str(cy)];
+            bm=B_set[str(cx)+','+str(cy)];
             bm=convert_to_yastn(bm)
             tm=convert_to_yastn(tm)
             
@@ -173,8 +173,8 @@ def save_triangle_iPESS(Bm_set, Tm_set, filenm, config_kwargs):
     Lx=config_kwargs['Lx'];
     Ly=config_kwargs['Ly'];
 
-    for cx in range(0,Lx):
-        for cy in range(0,Ly):
+    for cx in range(1,Lx+1):
+        for cy in range(1,Ly+1):
             bm=Bm_set[str(cx)+','+str(cy)]
             tm=Tm_set[str(cx)+','+str(cy)]
             bm=yastn_to_dict(bm)

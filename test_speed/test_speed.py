@@ -21,6 +21,7 @@ leg2 = yastn.Leg(config_Z2, s=-1, t=( 0, 1), D=(D0, D0))
 T = yastn.rand(config=config_Z2, legs=[leg1, leg2])
 print(T)
 print(T.dtype)
+# print(sys.getsizeof(T))
 
 
 
