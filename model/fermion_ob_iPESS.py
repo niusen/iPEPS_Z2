@@ -1,45 +1,33 @@
+import torch
+import yastn
 
-function Hamiltonians_spinful_Z2()
+def Hamiltonians_spinful_Z2(config_kwargs):
+    config_Z2 = yastn.make_config(sym='Z2',fermionic=True, **config_kwargs)
+    Vp = yastn.Leg(config_Z2, s=1, t=(0, 1), D=(2, 2))
+    Vp_conj = yastn.Leg(config_Z2, s=-1, t=(0, 1), D=(2, 2))
+    Vdummy = yastn.Leg(config_Z2, s=1, t=(0, 1), D=(2, 2))
+
     
 
-    # Vdummy=Rep[ℤ₂](1=>1);
-    Vdummy=Rep[ℤ₂](1=>2);
-    V=Rep[ℤ₂](0=>2,1=>2);
+    # Vdummy=Rep[ℤ₂](1=>2);
+    # V=Rep[ℤ₂](0=>2,1=>2);
 
 
-    Id=[1.0 0;0 1.0];
-    sm=[0 1.0;0 0]; sp=[0 0;1.0 0]; sz=[1.0 0; 0 -1.0]; occu=[0 0; 0 1.0];
+    Id=torch.tensor([[1.0, 0], [0, 1.0]]).to(device=config_Z2.device);
+    sm=torch.tensor([[0, 1.0], [0, 0]]).to(device=config_Z2.device); 
+    sp=torch.tensor([[0, 0], [1.0, 0]]).to(device=config_Z2.device);
+    sz=torch.tensor([[1.0, 0], [0, -1.0]]).to(device=config_Z2.device); 
+    occu=torch.tensor([[0, 0], [0, 1.0]]).to(device=config_Z2.device);
     
     #order of kron() command: (0,0), (0,1), (1,0), (1,1)
-    order=[1,4,3,2];
+    order=(1-1,4-1,3-1,2-1);
 
-    # Ident=kron(Id,Id);
-    # Ident=TensorMap(Ident[order,order],  V  ←  V);
 
-    # N_occu=kron(occu,Id)+kron(Id,occu);
-    # N_occu=TensorMap(N_occu[order,order],  V ←  V);
-    # n_double=kron(occu,occu)
-    # n_double=TensorMap(n_double[order,order],  V ←  V);
 
-    # # method 1
-    # Cdagup=zeros(4,4,1);
-    # Cdagup[order,order,1]=kron(sp,Id);
-    # Cdagdn=zeros(4,4,1);
-    # Cdagdn[order,order,1]=kron(sz,sp);
-    # Cdagup=TensorMap(Cdagup,  V ← V ⊗Vdummy);Cdagup=permute(Cdagup,(3,1,),(2,))
-    # Cdagdn=TensorMap(Cdagdn,  V ← V ⊗Vdummy);Cdagdn=permute(Cdagdn,(3,1,),(2,))
+    Ident=torch.kron(Id,Id);
+    Ident=Ident[order,order];
+    Ident_=yastn.zeros(config=config_Z2, legs=[Vp,Vp_conj])
 
-    # Cup=zeros(1,4,4);
-    # Cup[1,order,order]=kron(sm,Id);
-    # Cdn=zeros(1,4,4);
-    # Cdn[1,order,order]=kron(sz,sm);
-    # Cup=TensorMap(Cup, Vdummy ⊗ V ← V);
-    # Cdn=TensorMap(Cdn, Vdummy ⊗ V ← V);
-
-    # return Ident, N_occu, n_double, Cdagup, Cup, Cdagdn, Cdn
-
-    Ident=kron(Id,Id);
-    Ident=TensorMap(Ident[[1,4,3,2],[1,4,3,2]],  V  ←  V);
 
     N_occu=kron(occu,Id)+kron(Id,occu);
     N_occu=TensorMap(N_occu[[1,4,3,2],[1,4,3,2]],  V ←  V);
@@ -60,8 +48,8 @@ function Hamiltonians_spinful_Z2()
     Cdn[2,[1,4,3,2],[1,4,3,2]]=kron(sz,sm);
     C=TensorMap(Cup+Cdn, Vdummy ⊗ V ← V);
    
-    return (Ident,Ident,), (N_occu,N_occu,), (n_double,n_double,), (Cdag,Cdag,), (C,C,)
-end
+    return Ident, N_occu, n_double, Cdag, C
+
 
 function spin_operator_Z2()
     
@@ -222,110 +210,25 @@ function build_MM_RD(Cset,Tset,AA_RD_,cx,cy,Lx,Ly)
     return MM_RD
 end
 
-function build_MM_up(MM_LU,MM_RU)
-    up=MM_LU*MM_RU;
-    return up
-end
-
-function build_MM_down(MM_LD,MM_RD)
-    down=MM_LD*MM_RD;
-    return down
-end
 
 function ob_2x2_iPESS(CTM,AA_LU_,AA_RU_,AA_LD_,AA_RD_,cx,cy)
     global Lx,Ly
     Cset=CTM.Cset;
     Tset=CTM.Tset;
 
-    parall_data=[];
-    parall_data=@sync @distributed (append_data) for cm=1:4
-        if cm==1
-            MM=build_MM_LU(Cset,Tset,AA_LU_,cx,cy,Lx,Ly);
-        elseif cm==2
-            MM=build_MM_RU(Cset,Tset,AA_RU_,cx,cy,Lx,Ly);
-        elseif cm==3
-            MM=build_MM_LD(Cset,Tset,AA_LD_,cx,cy,Lx,Ly);
-        elseif cm==4
-            MM=build_MM_RD(Cset,Tset,AA_RD_,cx,cy,Lx,Ly);
-        end
-        [(myid(), cm, MM)]
-    end
+    MM_LU=build_MM_LU(Cset,Tset,AA_LU_,cx,cy,Lx,Ly);
+    MM_RU=build_MM_RU(Cset,Tset,AA_RU_,cx,cy,Lx,Ly);
+    MM_LD=build_MM_LD(Cset,Tset,AA_LD_,cx,cy,Lx,Ly);
+    MM_RD=build_MM_RD(Cset,Tset,AA_RD_,cx,cy,Lx,Ly);
 
-    # for cm=1:4
-    #     if parall_data[cm][2]==1
-    #         MM_LU=parall_data[cm][3];
-    #     elseif parall_data[cm][2]==2
-    #         MM_RU=parall_data[cm][3];
-    #     elseif parall_data[cm][2]==3
-    #         MM_LD=parall_data[cm][3];
-    #     elseif parall_data[cm][2]==4
-    #         MM_RD=parall_data[cm][3];
-    #     end
-    # end
+    M1=MM_LU*MM_RU;
+    M2=MM_LD*MM_RD;
 
-    order=[parall_data[1][2],parall_data[2][2],parall_data[3][2],parall_data[4][2]];
-    pos1=findall(x->x==1,order);
-    pos2=findall(x->x==2,order);
-    pos3=findall(x->x==3,order);
-    pos4=findall(x->x==4,order);
-    pos1=pos1[1];
-    pos2=pos2[1];
-    pos3=pos3[1];
-    pos4=pos4[1];
-    # parall_data=[];
-    
-    ################################
-    parall_data_2=[];
-    parall_data_2=@sync @distributed (append_data) for cm=1:2
-        if cm==1
-            MM=build_MM_up(parall_data[pos1][3],parall_data[pos2][3]);
-        elseif cm==2
-            MM=build_MM_down(parall_data[pos3][3],parall_data[pos4][3]);
-        end
-        [(myid(), cm, MM)]
-    end
-
-    # for cm=1:2
-    #     if parall_data_2[cm][2]==1
-    #         up=parall_data_2[cm][3];
-    #     elseif parall_data_2[cm][2]==2
-    #         down=parall_data_2[cm][3];
-    #     end
-    # end
-    parall_data=[];
-    
-    
-    M1=parall_data_2[1][3];
-    M2=parall_data_2[2][3];
-    parall_data_2=[];
-    # rho=@tensor up[1,2,3,4,]*down[1,2,3,4];
     rho=@tensor M1[1,2,3,4,]*M2[1,2,3,4];
     return rho
 end
 
 
-# function ob_2x2_iPESS(CTM,AA_LU_,AA_RU_,AA_LD_,AA_RD_,cx,cy)
-#     global Lx,Ly
-#     Cset=CTM.Cset;
-#     Tset=CTM.Tset;
-
-#     @tensor MM_LU[:]:=Cset[mod1(cx,Lx)][mod1(cy,Ly)].C1[1,2]*Tset[mod1(cx+1,Lx)][mod1(cy,Ly)].T1[2,3,-3]*Tset[mod1(cx,Lx)][mod1(cy+1,Ly)].T4[-1,4,1]*AA_LU_[4,-2,-4,3]; 
-#     @tensor MM_RU[:]:=Tset[mod1(cx+2,Lx)][mod1(cy,Ly)].T1[-1,3,1]* Cset[mod1(cx+3,Lx)][mod1(cy,Ly)].C2[1,2]* AA_RU_[-2,-4,4,3]* Tset[mod1(cx+3,Lx)][mod1(cy+1,Ly)].T2[2,4,-3];
-
-#     @tensor MM_LD[:]:=Tset[mod1(cx,Lx)][mod1(cy+2,Ly)].T4[1,3,-2]*AA_LD_[3,4,-5,-3]*Cset[mod1(cx,Lx)][mod1(cy+3,Ly)].C4[2,1]*Tset[mod1(cx+1,Lx)][mod1(cy+3,Ly)].T3[-4,4,2]; 
-#     @tensor MM_RD[:]:=Tset[mod1(cx+3,Lx)][mod1(cy+2,Ly)].T2[-4,-3,2]*Tset[mod1(cx+2,Lx)][mod1(cy+3,Ly)].T3[1,-2,-1]*Cset[mod1(cx+3,Lx)][mod1(cy+3,Ly)].C3[2,1]; 
-#     @tensor MM_RD[:]:=MM_RD[-1,1,2,-3]*AA_RD_[-2,1,2,-4]; 
-
-#     MM_LU=permute(MM_LU,(1,2,),(3,4,));
-#     MM_RU=permute(MM_RU,(1,2,),(3,4,));
-#     MM_LD=permute(MM_LD,(1,2,),(3,4,));
-#     MM_RD=permute(MM_RD,(1,2,),(3,4,));
-
-#     up=MM_LU*MM_RU;
-#     down=MM_LD*MM_RD;
-#     rho=@tensor up[1,2,3,4,]*down[1,2,3,4];
-#     return rho
-# end
 
 function get_AA_simple(double_B_set,double_T_set,pos)
     @tensor AA[:]:=double_B_set[pos[1]][pos[2]][-1,1,-4]*double_T_set[pos[1]][pos[2]][-2,-3,1];
