@@ -1,104 +1,161 @@
-import torch
+import numpy,torch
 import yastn
+
+def fill_Z2_Ham(T_dense,T):
+    T=T*0;
+    legs=T.get_legs();
+    if T.ndim==2:
+        even_dims=[legs[0].D[0], legs[1].D[0]]
+        odd_dims=[legs[0].D[1], legs[1].D[1]]
+        for c1 in range(0,2):
+            if c1==0:
+                range1=range(0,even_dims[0])
+            else:
+                range1=range(even_dims[0],even_dims[0]+odd_dims[0])
+            for c2 in range(0,2):
+                if c2==0:
+                    range2=range(0,even_dims[1])
+                else:
+                    range2=range(even_dims[1],even_dims[1]+odd_dims[1])
+                T_=T_dense[range1,:]
+                T_=T_[:,range2]
+
+                if numpy.mod(c1+c2,2)==0:
+                    T.set_block(ts=(c1, c2), val=T_, Ds=(len(range1), len(range2)))
+    elif T.ndim==3:
+        if (len(legs[0].D)==2)&(len(legs[1].D)==2)&(len(legs[2].D)==2):
+            even_dims=[legs[0].D[0], legs[1].D[0], legs[2].D[0]]
+            odd_dims=[legs[0].D[1], legs[1].D[1], legs[2].D[1]]
+        elif (len(legs[0].D)==1)&(legs[0].t==((1,),)):#only odd parity
+            even_dims=[0, legs[1].D[0], legs[2].D[0]]
+            odd_dims=[legs[0].D[1-1], legs[1].D[1], legs[2].D[1]]
+        elif (len(legs[2].D)==1)&(legs[2].t==((1,),)):#only odd parity
+            even_dims=[legs[0].D[0], legs[1].D[0], 0]
+            odd_dims=[legs[0].D[1], legs[1].D[1], legs[2].D[1-1]]
+        for c1 in range(0,2):
+            if (c1==0)&(even_dims[0]>0):
+                range1=range(0,even_dims[0])
+            elif (c1==1):
+                range1=range(even_dims[0],even_dims[0]+odd_dims[0])
+            else:
+                continue
+            for c2 in range(0,2):
+                if c2==0:
+                    range2=range(0,even_dims[1])
+                else:
+                    range2=range(even_dims[1],even_dims[1]+odd_dims[1])
+                for c3 in range(0,2):
+                    if (c3==0)&(even_dims[2]>0):
+                        range3=range(0,even_dims[2])
+                    elif (c3==1):
+                        range3=range(even_dims[2],even_dims[2]+odd_dims[2])
+                    else:
+                        continue
+
+                    T_=T_dense[range1,:,:]
+                    T_=T_[:,range2,:]
+                    T_=T_[:,:,range3]
+
+                    if numpy.mod(c1+c2+c3,2)==0:
+                        T.set_block(ts=(c1, c2, c3), val=T_, Ds=(len(range1), len(range2), len(range3)))
+    elif T.ndim==4:
+        even_dims=[legs[0].D[0], legs[1].D[0], legs[2].D[0], legs[3].D[0]]
+        odd_dims=[legs[0].D[1], legs[1].D[1], legs[2].D[1], legs[3].D[1]]
+        for c1 in range(0,2):
+            if c1==0:
+                range1=range(0,even_dims[0])
+            else:
+                range1=range(even_dims[0],even_dims[0]+odd_dims[0])
+            for c2 in range(0,2):
+                if c2==0:
+                    range2=range(0,even_dims[1])
+                else:
+                    range2=range(even_dims[1],even_dims[1]+odd_dims[1])
+                for c3 in range(0,2):
+                    if c3==0:
+                        range3=range(0,even_dims[2])
+                    else:
+                        range3=range(even_dims[2],even_dims[2]+odd_dims[2])
+                    for c4 in range(0,2):
+                        if c4==0:
+                            range4=range(0,even_dims[3])
+                        else:
+                            range4=range(even_dims[3],even_dims[3]+odd_dims[3])
+
+                        T_=T_dense[range1,:,:,:]
+                        T_=T_[:,range2,:,:]
+                        T_=T_[:,:,range3,:]
+                        T_=T_[:,:,:,range4]
+
+                        if numpy.mod(c1+c2+c3+c4,2)==0:
+                            T.set_block(ts=(c1, c2, c3, c4), val=T_, Ds=(len(range1), len(range2), len(range3), len(range4)))
+    return T
 
 def Hamiltonians_spinful_Z2(config_kwargs):
     config_Z2 = yastn.make_config(sym='Z2',fermionic=True, **config_kwargs)
+    Device=config_kwargs['default_device'];
+
     Vp = yastn.Leg(config_Z2, s=1, t=(0, 1), D=(2, 2))
     Vp_conj = yastn.Leg(config_Z2, s=-1, t=(0, 1), D=(2, 2))
-    Vdummy = yastn.Leg(config_Z2, s=1, t=(0, 1), D=(2, 2))
+    Vdummy = yastn.Leg(config_Z2, s=-1, t=[1], D=[2])
+    Vdummy_conj = yastn.Leg(config_Z2, s=1, t=[1], D=[2])
 
-    
-
-    # Vdummy=Rep[ℤ₂](1=>2);
-    # V=Rep[ℤ₂](0=>2,1=>2);
-
-
-    Id=torch.tensor([[1.0, 0], [0, 1.0]]).to(device=config_Z2.device);
-    sm=torch.tensor([[0, 1.0], [0, 0]]).to(device=config_Z2.device); 
-    sp=torch.tensor([[0, 0], [1.0, 0]]).to(device=config_Z2.device);
-    sz=torch.tensor([[1.0, 0], [0, -1.0]]).to(device=config_Z2.device); 
-    occu=torch.tensor([[0, 0], [0, 1.0]]).to(device=config_Z2.device);
+    Id=torch.tensor([[1.0, 0], [0, 1.0]]).to(device=Device);
+    sm=torch.tensor([[0, 1.0], [0, 0]]).to(device=Device); 
+    sp=torch.tensor([[0, 0], [1.0, 0]]).to(device=Device);
+    sz=torch.tensor([[1.0, 0], [0, -1.0]]).to(device=Device); 
+    occu=torch.tensor([[0, 0], [0, 1.0]]).to(device=Device);
     
     #order of kron() command: (0,0), (0,1), (1,0), (1,1)
     order=(1-1,4-1,3-1,2-1);
 
-
-
     Ident=torch.kron(Id,Id);
-    Ident=Ident[order,order];
+    Ident=Ident[order,:];
+    Ident=Ident[:,order];
     Ident_=yastn.zeros(config=config_Z2, legs=[Vp,Vp_conj])
+    Ident_=fill_Z2_Ham(Ident,Ident_)
 
+    N_occu=torch.kron(occu,Id)+torch.kron(Id,occu);
+    N_occu=N_occu[order,:]
+    N_occu=N_occu[:,order]
+    N_occu_=yastn.zeros(config=config_Z2, legs=[Vp,Vp_conj])
+    N_occu_=fill_Z2_Ham(N_occu,N_occu_)
 
-    N_occu=kron(occu,Id)+kron(Id,occu);
-    N_occu=TensorMap(N_occu[[1,4,3,2],[1,4,3,2]],  V ←  V);
-    n_double=kron(occu,occu)
-    n_double=TensorMap(n_double[[1,4,3,2],[1,4,3,2]],  V ←  V);
+    n_double=torch.kron(occu,occu)
+    n_double=n_double[order,:]
+    n_double=n_double[:,order]
+    n_double_=yastn.zeros(config=config_Z2, legs=[Vp,Vp_conj])
+    n_double_=fill_Z2_Ham(n_double,n_double_)
 
-    # method 1
-    Cdagup=zeros(4,4,2);
-    Cdagup[[1,4,3,2],[1,4,3,2],1]=kron(sp,Id);
-    Cdagdn=zeros(4,4,2);
-    Cdagdn[[1,4,3,2],[1,4,3,2],2]=kron(sz,sp);
-    Cdag=TensorMap(Cdagup+Cdagdn,  V ← V ⊗Vdummy);
-    Cdag=permute(Cdag,(3,1,),(2,))
+    Cdagup=torch.zeros((4,4,2),dtype=Id.dtype,device=Id.device);
+    Cdagup[:,:,0]=torch.kron(sp,Id);
+    Cdagdn=torch.zeros((4,4,2),dtype=Id.dtype,device=Id.device);
+    Cdagdn[:,:,1]=torch.kron(sz,sp);
+    # Cdag=TensorMap(,  V ← V ⊗Vdummy);
+    Cdag=Cdagup+Cdagdn
+    Cdag=Cdag[order,:,:]
+    Cdag=Cdag[:,order,:]
+    Cdag_=yastn.zeros(config=config_Z2, legs=[Vp,Vp_conj,Vdummy])
+    Cdag_=fill_Z2_Ham(Cdag,Cdag_)
+    Cdag_=yastn.transpose(Cdag_,axes=(2,0,1))
 
-    Cup=zeros(2,4,4);
-    Cup[1,[1,4,3,2],[1,4,3,2]]=kron(sm,Id);
-    Cdn=zeros(2,4,4);
-    Cdn[2,[1,4,3,2],[1,4,3,2]]=kron(sz,sm);
-    C=TensorMap(Cup+Cdn, Vdummy ⊗ V ← V);
+    Cup=torch.zeros((2,4,4),dtype=Id.dtype,device=Id.device);
+    Cup[0,:,:]=torch.kron(sm,Id);
+    Cdn=torch.zeros((2,4,4),dtype=Id.dtype,device=Id.device);
+    Cdn[1,:,:]=torch.kron(sz,sm);
+    C=Cup+Cdn;
+    C=C[:,order,:]
+    C=C[:,:,order]
+    C_=yastn.zeros(config=config_Z2, legs=[Vdummy_conj, Vp,Vp_conj])
+    C_=fill_Z2_Ham(C,C_)
+    # C=TensorMap(, Vdummy ⊗ V ← V);
    
-    return Ident, N_occu, n_double, Cdag, C
-
-
-function spin_operator_Z2()
-    
-    V=Rep[ℤ₂](0=>2,1=>2);
-
-
-    Id=[1.0 0;0 1.0];
-    sm=[0 1.0;0 0]; sp=[0 0;1.0 0]; sz=[1.0 0; 0 -1.0]; occu=[0 0; 0 1.0];
-    
-    #order of kron() command: (0,0), (0,1), (1,0), (1,1)
-    order=[1,4,3,2];
+    return Ident_, N_occu_, n_double_, Cdag_, C_
 
 
 
-    Ident=kron(Id,Id);
-    Ident=TensorMap(Ident[[1,4,3,2],[1,4,3,2]],  V  ←  V);
 
-    N_occu=kron(occu,Id)+kron(Id,occu);
-    N_occu=TensorMap(N_occu[[1,4,3,2],[1,4,3,2]],  V ←  V);
-    n_double=kron(occu,occu)
-    n_double=TensorMap(n_double[[1,4,3,2],[1,4,3,2]],  V ←  V);
-
-    
-    Cdagup_Cup=zeros(4,4);
-    Cdagup_Cup[[1,4,3,2],[1,4,3,2]]=kron(sp*sm,Id);
-    Cdagup_Cup=TensorMap(Cdagup_Cup,  V ← V);
-
-    Cdagdn_Cdn=zeros(4,4);
-    Cdagdn_Cdn[[1,4,3,2],[1,4,3,2]]=kron(Id,sp*sm);
-    Cdagdn_Cdn=TensorMap(Cdagdn_Cdn,  V ← V);
-
-    Cdagup_Cdn=zeros(4,4);
-    Cdagup_Cdn[[1,4,3,2],[1,4,3,2]]=kron(sp,sm);
-    Cdagup_Cdn=TensorMap(Cdagup_Cdn,  V ← V);
-
-    Cdagdn_Cup=zeros(4,4);
-    Cdagdn_Cup[[1,4,3,2],[1,4,3,2]]=kron(sm,sp);
-    Cdagdn_Cup=TensorMap(Cdagdn_Cup,  V ← V);
-
-
-    sx=Cdagup_Cdn+Cdagdn_Cup;
-    sy=-im*Cdagup_Cdn+im*Cdagdn_Cup;
-    sz=Cdagup_Cup-Cdagdn_Cdn;
-
-
-    return sx,sy,sz
-end
-
-function Operators_spinful_Z2()
+def Operators_spinful_Z2():
     
     Vdummy=Rep[ℤ₂](1=>2);
     V=Rep[ℤ₂](0=>2,1=>2);
@@ -186,7 +243,7 @@ function Operators_spinful_Z2()
     @assert norm(Hchiral-Hchiral_)/norm(Hchiral)<1e-12;
 
     return (Ident,Ident,), (N_occu,N_occu,), (n_hole,n_hole), (n_double,n_double,), (Cdag,Cdag,), (C,C,), (CdagupCdagdn,CdagupCdagdn), (Pairinga,Pairinga), (Pairingb,Pairingb), (Sa,Sa), (Sb,Sb), chirality_S1,chirality_S2,chirality_S3
-end
+
 function build_MM_LU(Cset,Tset,AA_LU_,cx,cy,Lx,Ly)
     @tensor MM_LU[:]:=Cset[mod1(cx,Lx)][mod1(cy,Ly)].C1[1,2]*Tset[mod1(cx+1,Lx)][mod1(cy,Ly)].T1[2,3,-3]*Tset[mod1(cx,Lx)][mod1(cy+1,Ly)].T4[-1,4,1]*AA_LU_[4,-2,-4,3]; 
     MM_LU=permute(MM_LU,(1,2,),(3,4,));
