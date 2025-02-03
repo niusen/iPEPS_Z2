@@ -81,3 +81,13 @@ class OPTARGS():
         return res[:-1]
 
 
+class Square_Hubbard_Energy_settings():
+
+    def __init__(self):
+        self.model= 'spinful_triangle_lattice'
+
+    def __str__(self):
+        res=type(self).__name__+"\n"
+        for x in list(filter(lambda x: "__" not in x,dir(self))):
+            res+=f"{x}= {getattr(self,x)}\n"
+        return res[:-1]

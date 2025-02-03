@@ -2,6 +2,8 @@ from collections import OrderedDict
 
 def mod1(x,y):
     return 1+ (x-1)%y
+def mod(x,y):
+    return (x)%y
 
 def initial_cell(L1,L2):
     Cell=OrderedDict();
