@@ -1,5 +1,8 @@
 import numpy,torch
 import yastn
+from config.settings import *
+import copy
+from ctmrg.Fermionic_CTMRG_unitcell_iPESS import build_double_layer_swap_Tm,build_double_layer_swap_Bm
 
 def fill_Z2_Ham(T_dense,T):
     T=T*0;
@@ -91,6 +94,8 @@ def fill_Z2_Ham(T_dense,T):
                             T.set_block(ts=(c1, c2, c3, c4), val=T_, Ds=(len(range1), len(range2), len(range3), len(range4)))
     return T
 
+
+
 def Hamiltonians_spinful_Z2(config_kwargs):
     config_Z2 = yastn.make_config(sym='Z2',fermionic=True, **config_kwargs)
     Device=config_kwargs['default_device'];
@@ -150,258 +155,317 @@ def Hamiltonians_spinful_Z2(config_kwargs):
     C_=fill_Z2_Ham(C,C_)
     # C=TensorMap(, Vdummy ⊗ V ← V);
    
-    return Ident_, N_occu_, n_double_, Cdag_, C_
+    CdagC_string = yastn.eye(config=config_Z2,legs=C_.get_legs(axes=1-1))
+    return Ident_, N_occu_, n_double_, Cdag_, C_, CdagC_string
 
 
-
-
-def Operators_spinful_Z2():
+def spin_operator_Z2(config_kwargs):
     
-    Vdummy=Rep[ℤ₂](1=>2);
-    V=Rep[ℤ₂](0=>2,1=>2);
+    config_Z2 = yastn.make_config(sym='Z2',fermionic=True, **config_kwargs)
+    Device=config_kwargs['default_device'];
+
+    Vp = yastn.Leg(config_Z2, s=1, t=(0, 1), D=(2, 2))
+    Vp_conj = yastn.Leg(config_Z2, s=-1, t=(0, 1), D=(2, 2))
 
 
-
-    Id=[1.0 0;0 1.0];
-    sm=[0 1.0;0 0]; sp=[0 0;1.0 0]; sz=[1.0 0; 0 -1.0]; occu=[0 0; 0 1.0];
+    Id=torch.tensor([[1.0, 0], [0, 1.0]]).to(device=Device);
+    sm=torch.tensor([[0, 1.0], [0, 0]]).to(device=Device); 
+    sp=torch.tensor([[0, 0], [1.0, 0]]).to(device=Device);
+    sz=torch.tensor([[1.0, 0], [0, -1.0]]).to(device=Device); 
+    occu=torch.tensor([[0, 0], [0, 1.0]]).to(device=Device);
+    #order of kron() command: (0,0), (0,1), (1,0), (1,1)
+    order=(1-1,4-1,3-1,2-1);
     
-    #order: (0,0), (0,1), (1,0), (1,1)
+    Cdagup_Cup=torch.zeros((4,4),dtype=Id.dtype,device=Id.device);
+    Cdagup_Cup=torch.kron(torch.matmul(sp,sm),Id);
+    Cdagup_Cup=Cdagup_Cup[order,:]
+    Cdagup_Cup=Cdagup_Cup[:,order]
+    Cdagup_Cup_=yastn.zeros(config=config_Z2, legs=[Vp,Vp_conj])
+    Cdagup_Cup_=fill_Z2_Ham(Cdagup_Cup,Cdagup_Cup_)
+
+    Cdagdn_Cdn=torch.zeros((4,4),dtype=Id.dtype,device=Id.device);
+    Cdagdn_Cdn=torch.kron(Id,torch.matmul(sp,sm));
+    Cdagdn_Cdn=Cdagdn_Cdn[order,:]
+    Cdagdn_Cdn=Cdagdn_Cdn[:,order]
+    Cdagdn_Cdn_=yastn.zeros(config=config_Z2, legs=[Vp,Vp_conj])
+    Cdagdn_Cdn_=fill_Z2_Ham(Cdagdn_Cdn,Cdagdn_Cdn_)
+
+    Cdagup_Cdn=torch.zeros((4,4),dtype=Id.dtype,device=Id.device);
+    Cdagup_Cdn=torch.kron(sp,sm);
+    Cdagup_Cdn=Cdagup_Cdn[order,:]
+    Cdagup_Cdn=Cdagup_Cdn[:,order]
+    Cdagup_Cdn_=yastn.zeros(config=config_Z2, legs=[Vp,Vp_conj])
+    Cdagup_Cdn_=fill_Z2_Ham(Cdagup_Cdn,Cdagup_Cdn_)
+
+    Cdagdn_Cup=torch.zeros((4,4),dtype=Id.dtype,device=Id.device);
+    Cdagdn_Cup=torch.kron(sm,sp);
+    Cdagdn_Cup=Cdagdn_Cup[order,:]
+    Cdagdn_Cup=Cdagdn_Cup[:,order]
+    Cdagdn_Cup_=yastn.zeros(config=config_Z2, legs=[Vp,Vp_conj])
+    Cdagdn_Cup_=fill_Z2_Ham(Cdagdn_Cup,Cdagdn_Cup_)
+
+
+    sx=Cdagup_Cdn_+Cdagdn_Cup_;
+    sy=-1j*Cdagup_Cdn_+1j*Cdagdn_Cup_;
+    sz=Cdagup_Cup_-Cdagdn_Cdn_;
+
+    return sx,sy,sz
+
+def Operators_spinful_Z2(config_kwargs):
+    config_Z2 = yastn.make_config(sym='Z2',fermionic=True, **config_kwargs)
+    Device=config_kwargs['default_device'];
+
+    Vp = yastn.Leg(config_Z2, s=1, t=(0, 1), D=(2, 2))
+    Vp_conj = yastn.Leg(config_Z2, s=-1, t=(0, 1), D=(2, 2))
+    Vdummy = yastn.Leg(config_Z2, s=-1, t=[1], D=[2])
+    Vdummy_conj = yastn.Leg(config_Z2, s=1, t=[1], D=[2])
+
+
+    Id=torch.tensor([[1.0, 0], [0, 1.0]]).to(device=Device);
+    sm=torch.tensor([[0, 1.0], [0, 0]]).to(device=Device); 
+    sp=torch.tensor([[0, 0], [1.0, 0]]).to(device=Device);
+    sz=torch.tensor([[1.0, 0], [0, -1.0]]).to(device=Device); 
+    occu=torch.tensor([[0, 0], [0, 1.0]]).to(device=Device);
+    #order of kron() command: (0,0), (0,1), (1,0), (1,1)
+    order=(1-1,4-1,3-1,2-1);
     
-    Ident=kron(Id,Id);
-    Ident=TensorMap(Ident[[1,4,3,2],[1,4,3,2]],  V  ←  V);
+    Ident=torch.kron(Id,Id);
+    Ident=Ident[order,:];
+    Ident=Ident[:,order];
+    Ident_=yastn.zeros(config=config_Z2, legs=[Vp,Vp_conj])
+    Ident_=fill_Z2_Ham(Ident,Ident_)
 
-    N_occu=kron(occu,Id)+kron(Id,occu);
-    N_occu=TensorMap(N_occu[[1,4,3,2],[1,4,3,2]],  V ←  V);
-    n_double=kron(occu,occu)
-    n_double=TensorMap(n_double[[1,4,3,2],[1,4,3,2]],  V ←  V);
+ 
 
+    Sp=torch.kron(sp,sm);
+    Sp=Sp[order,:]
+    Sp=Sp[:,order]
+    Sp_=yastn.zeros(config=config_Z2, legs=[Vp,Vp_conj])
+    Sp_=fill_Z2_Ham(Sp,Sp_)
 
-    n_hole=kron(Id-occu,Id-occu);
-    n_hole=TensorMap(n_hole[[1,4,3,2],[1,4,3,2]],  V ←  V);
+    Sm=torch.kron(sm,sp);
+    Sm=Sm[order,:]
+    Sm=Sm[:,order]
+    Sm_=yastn.zeros(config=config_Z2, legs=[Vp,Vp_conj])
+    Sm_=fill_Z2_Ham(Sm,Sm_)
 
-    # method 1
-    Cdagup=zeros(4,4,2);
-    Cdagup[[1,4,3,2],[1,4,3,2],1]=kron(sp,Id);
-    Cdagdn=zeros(4,4,2);
-    Cdagdn[[1,4,3,2],[1,4,3,2],2]=kron(sz,sp);
-    Cdag=TensorMap(Cdagup+Cdagdn,  V ← V ⊗Vdummy);
-    Cdag=permute(Cdag,(3,1,),(2,))
+    Sz=torch.kron(occu,Id)/2-torch.kron(Id,occu)/2;
+    Sz=Sz[order,:]
+    Sz=Sz[:,order]
+    Sz_=yastn.zeros(config=config_Z2, legs=[Vp,Vp_conj])
+    Sz_=fill_Z2_Ham(Sz,Sz_)
 
-    Cup=zeros(2,4,4);
-    Cup[1,[1,4,3,2],[1,4,3,2]]=kron(sm,Id);
-    Cdn=zeros(2,4,4);
-    Cdn[2,[1,4,3,2],[1,4,3,2]]=kron(sz,sm);
-    C=TensorMap(Cup+Cdn, Vdummy ⊗ V ← V);
+    SpSm = yastn.ncon([Sp_, Sm_], [[-1,-2], [-3,-4]]);
+    SmSp = yastn.ncon([Sm_, Sp_], [[-1,-2], [-3,-4]]);
+    SzSz = yastn.ncon([Sz_, Sz_], [[-1,-2], [-3,-4]]);
 
-
-    CdagupCdagdn=zeros(4,4);
-    CdagupCdagdn[[1,4,3,2],[1,4,3,2]]=kron(sp,sp);
-    CdagupCdagdn=TensorMap(CdagupCdagdn,  V ← V );
-
-    Vdummy0=Rep[ℤ₂](0=>1);
-    Pairinga=zeros(4,4,1);#CdagupCdagdn
-    Pairinga[[1,4,3,2],[1,4,3,2],1]=kron(sp,sp);
-    Pairinga=TensorMap(Pairinga,  V ← V ⊗Vdummy0);
-    Pairinga=permute(Pairinga,(3,1,),(2,))
-
-    Pairingb=zeros(1,4,4);#CupCdn
-    Pairingb[1,[1,4,3,2],[1,4,3,2]]=kron(sm,sm);
-    Pairingb=TensorMap(Pairingb, Vdummy0 ⊗ V ← V);
-
-    #Spin operator
-    Sp=zeros(4,4);
-    Sp[[1,4,3,2],[1,4,3,2]]=kron(sp,sm);
-    Sm=zeros(4,4);
-    Sm[[1,4,3,2],[1,4,3,2]]=kron(sm,sp);
-    Sz=zeros(4,4);
-    Sz[[1,4,3,2],[1,4,3,2]]=kron(occu,Id)/2-kron(Id,occu)/2;
-    @tensor SpSm[:]:=Sp[-1,-2]*Sm[-3,-4];
-    @tensor SmSp[:]:=Sm[-1,-2]*Sp[-3,-4];
-    @tensor SzSz[:]:=Sz[-1,-2]*Sz[-3,-4];
-    SS=SpSm/2+SmSp/2+SzSz;
-    SS=permutedims(SS,(1,3,2,4));#s1's2's1s2
-    SS=TensorMap(SS, V ⊗ V ← V ⊗ V);
-    SS=permute(SS,(1,3,),(2,4,));#V,s1',s1,s2',s2
-    u0,s0,v0=tsvd(SS; trunc=truncerr(1e-12));
-    @assert norm(u0*s0*v0-SS)<1e-14;
+    SS=SpSm/2+SmSp/2+SzSz;#s1' s1 s2' s2
+    # SS=yastn.transpose(SS, axes=(1-1,3-1,2-1,4-1))
+    u0,s0,v0 = yastn.linalg.svd_with_truncation(SS, axes=((0, 1), (2, 3)), svd_on_cpu=True, tol=1e-8);
+    SS_trun=yastn.ncon([u0,s0,v0], [[-1,-2,1],[1,2], [2,-3,-4]]);
+    assert yastn.linalg.norm(SS_trun-SS)<1e-14;
     
-    Sa=permute(u0*s0,(3,1,),(2,));
-    Sb=permute(v0,(1,2,),(3,));
+    # Sa=permute(u0*s0,(3,1,),(2,));
+    # Sb=permute(v0,(1,2,),(3,));
+    Sa=yastn.ncon([u0,s0], [[-2,-3,1],[1,-1]]);
+    Sb=v0
+    SS_string = yastn.eye(config=config_Z2,legs=Sb.get_legs(axes=1-1))
 
-    Sx=(Sp+Sm)/2;
-    Sy=(Sp-Sm)/(2*im);
-    @tensor Hchiral[:]:=Sx[-1,-4]*Sy[-2,-5]*Sz[-3,-6]-Sx[-1,-4]*Sz[-2,-5]*Sy[-3,-6]+Sy[-1,-4]*Sz[-2,-5]*Sx[-3,-6]-Sy[-1,-4]*Sx[-2,-5]*Sz[-3,-6]+Sz[-1,-4]*Sx[-2,-5]*Sy[-3,-6]-Sz[-1,-4]*Sy[-2,-5]*Sx[-3,-6];
-    Hchiral=TensorMap(Hchiral, V ⊗ V ⊗ V ← V ⊗ V ⊗ V);
-    u,s,v=tsvd(permute(Hchiral,(1,4,),(2,3,5,6)); trunc=truncerr(1e-12));
+    Sx=(Sp_+Sm_)/2;
+    Sy=(Sp_-Sm_)/(2*1j);
+    #Hchiral[:]:=Sx[-1,-4]*Sy[-2,-5]*Sz[-3,-6]-Sx[-1,-4]*Sz[-2,-5]*Sy[-3,-6]+Sy[-1,-4]*Sz[-2,-5]*Sx[-3,-6]-Sy[-1,-4]*Sx[-2,-5]*Sz[-3,-6]+Sz[-1,-4]*Sx[-2,-5]*Sy[-3,-6]-Sz[-1,-4]*Sy[-2,-5]*Sx[-3,-6];
+    xyz=yastn.ncon([Sx,Sy,Sz_], [[-1,-4],[-2,-5], [-3,-6]]);
+    xzy=yastn.ncon([Sx,Sz_,Sy], [[-1,-4],[-2,-5], [-3,-6]]);
+    yzx=yastn.ncon([Sy,Sz_,Sx], [[-1,-4],[-2,-5], [-3,-6]]);
+    yxz=yastn.ncon([Sy,Sx,Sz_], [[-1,-4],[-2,-5], [-3,-6]]);
+    zxy=yastn.ncon([Sz_,Sx,Sy], [[-1,-4],[-2,-5], [-3,-6]]);
+    zyx=yastn.ncon([Sz_,Sy,Sx], [[-1,-4],[-2,-5], [-3,-6]]);
+    Hchiral=xyz-xzy+yzx-yxz+zxy-zyx;
+    #u,s,v=tsvd(permute(Hchiral,(1,4,),(2,3,5,6)); trunc=truncerr(1e-12));
+    u,s,v=yastn.linalg.svd_with_truncation(Hchiral, axes=((1-1, 4-1), (2-1, 3-1, 5-1, 6-1)), svd_on_cpu=True, tol=1e-8);
+    
     chirality_S1=u;
-    S2S3=s*v;
-    u,s,v=tsvd(permute(S2S3,(1,2,4,),(3,5)); trunc=truncerr(1e-12));
+    # S2S3=s*v;
+    S2S3=yastn.ncon([s,v], [[-1,1], [1,-2,-3,-4,-5]]);
+    #u,s,v=tsvd(permute(S2S3,(1,2,4,),(3,5)); trunc=truncerr(1e-12));
+    u,s,v=yastn.linalg.svd_with_truncation(S2S3, axes=((1-1, 2-1, 4-1), (3-1, 5-1)), svd_on_cpu=True, tol=1e-8);
     chirality_S2=u;
-    chirality_S3=s*v;
-    @tensor Hchiral_[:]:=chirality_S1[-1,-4,1]*chirality_S2[1,-2,-5,2]*chirality_S3[2,-3,-6];
-    Hchiral_=permute(Hchiral_,(1,2,3,),(4,5,6,));
-    @assert norm(Hchiral-Hchiral_)/norm(Hchiral)<1e-12;
+    # chirality_S3=s*v;
+    chirality_S3=yastn.ncon([s,v], [[-1,1], [1,-2,-3]]);
+    #@tensor Hchiral_[:]:=chirality_S1[-1,-4,1]*chirality_S2[1,-2,-5,2]*chirality_S3[2,-3,-6];
+    #Hchiral_=permute(Hchiral_,(1,2,3,),(4,5,6,));
+    Hchiral_trun=yastn.ncon([chirality_S1,chirality_S2,chirality_S3], [[-1,-4,1], [1,-2,-5,2], [2,-3,-6]]);
+    assert yastn.linalg.norm(Hchiral-Hchiral_trun)/yastn.linalg.norm(Hchiral)<1e-12;
+    chirality_string12 = yastn.eye(config=config_Z2,legs=chirality_S2.get_legs(axes=1-1))
+    chirality_string23 = yastn.eye(config=config_Z2,legs=chirality_S3.get_legs(axes=1-1))
 
-    return (Ident,Ident,), (N_occu,N_occu,), (n_hole,n_hole), (n_double,n_double,), (Cdag,Cdag,), (C,C,), (CdagupCdagdn,CdagupCdagdn), (Pairinga,Pairinga), (Pairingb,Pairingb), (Sa,Sa), (Sb,Sb), chirality_S1,chirality_S2,chirality_S3
+    return Sa, Sb, SS_string, chirality_S1,chirality_S2,chirality_S3, chirality_string12, chirality_string23
 
-function build_MM_LU(Cset,Tset,AA_LU_,cx,cy,Lx,Ly)
-    @tensor MM_LU[:]:=Cset[mod1(cx,Lx)][mod1(cy,Ly)].C1[1,2]*Tset[mod1(cx+1,Lx)][mod1(cy,Ly)].T1[2,3,-3]*Tset[mod1(cx,Lx)][mod1(cy+1,Ly)].T4[-1,4,1]*AA_LU_[4,-2,-4,3]; 
-    MM_LU=permute(MM_LU,(1,2,),(3,4,));
+
+
+def build_MM_LU(Cset,Tset,AA_LU_,cx,cy,Lx,Ly):
+    #@tensor MM_LU[:]:=Cset[mod1(cx,Lx)][mod1(cy,Ly)].C1[1,2]*Tset[mod1(cx+1,Lx)][mod1(cy,Ly)].T1[2,3,-3]*Tset[mod1(cx,Lx)][mod1(cy+1,Ly)].T4[-1,4,1]*AA_LU_[4,-2,-4,3]; 
+    # MM_LU=permute(MM_LU,(1,2,),(3,4,));
+    MM_LU=yastn.ncon([Cset[str(mod1(cx,Lx))+','+str(mod1(cy,Ly))]['C1'], Tset[str(mod1(cx+1,Lx))+','+str(mod1(cy,Ly))]['T1'], Tset[str(mod1(cx,Lx))+','+str(mod1(cy+1,Ly))]['T4'], AA_LU_], [[1,2], [2,3,-3], [-1,4,1], [4,-2,-4,3]]);
     return MM_LU
-end
 
-function build_MM_RU(Cset,Tset,AA_RU_,cx,cy,Lx,Ly)
-    @tensor MM_RU[:]:=Tset[mod1(cx+2,Lx)][mod1(cy,Ly)].T1[-1,3,1]* Cset[mod1(cx+3,Lx)][mod1(cy,Ly)].C2[1,2]* AA_RU_[-2,-4,4,3]* Tset[mod1(cx+3,Lx)][mod1(cy+1,Ly)].T2[2,4,-3];
-    MM_RU=permute(MM_RU,(1,2,),(3,4,));
+
+def build_MM_RU(Cset,Tset,AA_RU_,cx,cy,Lx,Ly):
+    # @tensor MM_RU[:]:=Tset[mod1(cx+2,Lx)][mod1(cy,Ly)].T1[-1,3,1]* Cset[mod1(cx+3,Lx)][mod1(cy,Ly)].C2[1,2]* AA_RU_[-2,-4,4,3]* Tset[mod1(cx+3,Lx)][mod1(cy+1,Ly)].T2[2,4,-3];
+    # MM_RU=permute(MM_RU,(1,2,),(3,4,));
+    MM_RU=yastn.ncon([Tset[str(mod1(cx+2,Lx))+','+str(mod1(cy,Ly))]['T1'],  Cset[str(mod1(cx+3,Lx))+','+str(mod1(cy,Ly))]['C2'], AA_RU_, Tset[str(mod1(cx+3,Lx))+','+str(mod1(cy+1,Ly))]['T2']], [[-1,3,1], [1,2], [-2,-4,4,3], [2,4,-3]]);
     return MM_RU
-end
-function build_MM_LD(Cset,Tset,AA_LD_,cx,cy,Lx,Ly)
-    @tensor MM_LD[:]:=Tset[mod1(cx,Lx)][mod1(cy+2,Ly)].T4[1,3,-2]*AA_LD_[3,4,-5,-3]*Cset[mod1(cx,Lx)][mod1(cy+3,Ly)].C4[2,1]*Tset[mod1(cx+1,Lx)][mod1(cy+3,Ly)].T3[-4,4,2]; 
-    MM_LD=permute(MM_LD,(1,2,),(3,4,));
+
+def build_MM_LD(Cset,Tset,AA_LD_,cx,cy,Lx,Ly):
+    # @tensor MM_LD[:]:=Tset[mod1(cx,Lx)][mod1(cy+2,Ly)].T4[1,3,-2]*AA_LD_[3,4,-5,-3]*Cset[mod1(cx,Lx)][mod1(cy+3,Ly)].C4[2,1]*Tset[mod1(cx+1,Lx)][mod1(cy+3,Ly)].T3[-4,4,2]; 
+    # MM_LD=permute(MM_LD,(1,2,),(3,4,));
+    MM_LD=yastn.ncon([Tset[str(mod1(cx,Lx))+','+str(mod1(cy+2,Ly))]['T4'], AA_LD_, Cset[str(mod1(cx,Lx))+','+str(mod1(cy+3,Ly))]['C4'], Tset[str(mod1(cx+1,Lx))+','+str(mod1(cy+3,Ly))]['T3']], [[1,3,-2], [3,4,-5,-3], [2,1], [-4,4,2]]);
     return MM_LD
-end
-function build_MM_RD(Cset,Tset,AA_RD_,cx,cy,Lx,Ly)
-    @tensor MM_RD[:]:=Tset[mod1(cx+3,Lx)][mod1(cy+2,Ly)].T2[-4,-3,2]*Tset[mod1(cx+2,Lx)][mod1(cy+3,Ly)].T3[1,-2,-1]*Cset[mod1(cx+3,Lx)][mod1(cy+3,Ly)].C3[2,1]; 
-    @tensor MM_RD[:]:=MM_RD[-1,1,2,-3]*AA_RD_[-2,1,2,-4]; 
-    MM_RD=permute(MM_RD,(1,2,),(3,4,));
+
+def build_MM_RD(Cset,Tset,AA_RD_,cx,cy,Lx,Ly):
+    # @tensor MM_RD[:]:=Tset[mod1(cx+3,Lx)][mod1(cy+2,Ly)].T2[-4,-3,2]*Tset[mod1(cx+2,Lx)][mod1(cy+3,Ly)].T3[1,-2,-1]*Cset[mod1(cx+3,Lx)][mod1(cy+3,Ly)].C3[2,1]; 
+    # @tensor MM_RD[:]:=MM_RD[-1,1,2,-3]*AA_RD_[-2,1,2,-4]; 
+    # MM_RD=permute(MM_RD,(1,2,),(3,4,));
+    MM_RD=yastn.ncon([Tset[str(mod1(cx+3,Lx))+','+str(mod1(cy+2,Ly))]['T2'], Tset[str(mod1(cx+2,Lx))+','+str(mod1(cy+3,Ly))]['T3'], Cset[str(mod1(cx+3,Lx))+','+str(mod1(cy+3,Ly))]['C3']], [[-4,-3,2], [1,-2,-1], [2,1]]);
+    MM_RD=yastn.ncon([MM_RD, AA_RD_], [[-1,1,2,-3], [-2,1,2,-4]]);
     return MM_RD
-end
 
 
-function ob_2x2_iPESS(CTM,AA_LU_,AA_RU_,AA_LD_,AA_RD_,cx,cy)
-    global Lx,Ly
-    Cset=CTM.Cset;
-    Tset=CTM.Tset;
+
+def ob_2x2_iPESS(CTM,AA_LU_,AA_RU_,AA_LD_,AA_RD_,cx,cy,Lx,Ly):
+    Cset=CTM['Cset'];
+    Tset=CTM['Tset'];
 
     MM_LU=build_MM_LU(Cset,Tset,AA_LU_,cx,cy,Lx,Ly);
     MM_RU=build_MM_RU(Cset,Tset,AA_RU_,cx,cy,Lx,Ly);
     MM_LD=build_MM_LD(Cset,Tset,AA_LD_,cx,cy,Lx,Ly);
     MM_RD=build_MM_RD(Cset,Tset,AA_RD_,cx,cy,Lx,Ly);
 
-    M1=MM_LU*MM_RU;
-    M2=MM_LD*MM_RD;
+    # M1=MM_LU*MM_RU;
+    # M2=MM_LD*MM_RD;
+    # rho=@tensor M1[1,2,3,4,]*M2[1,2,3,4];
 
-    rho=@tensor M1[1,2,3,4,]*M2[1,2,3,4];
+    rho=yastn.ncon([MM_LU, MM_RU, MM_LD, MM_RD], [[5,6,1,2], [1,2,7,8], [5,6,3,4], [3,4,7,8]]);
     return rho
-end
 
 
 
-function get_AA_simple(double_B_set,double_T_set,pos)
-    @tensor AA[:]:=double_B_set[pos[1]][pos[2]][-1,1,-4]*double_T_set[pos[1]][pos[2]][-2,-3,1];
+
+def get_AA_simple(double_B_set,double_T_set,pos):
+    # @tensor AA[:]:=double_B_set[pos[1]][pos[2]][-1,1,-4]*double_T_set[pos[1]][pos[2]][-2,-3,1];
+    AA=yastn.ncon([double_B_set[str(pos[1-1])+','+str(pos[2-1])], double_T_set[str(pos[1-1])+','+str(pos[2-1])]], [[-1,1,-4], [-2,-3,1]]);
     return AA
-end
 
 
 
 
-function ob_onsite_iPESS(CTM,O1,B_set,T_set, double_B_set, double_T_set,cx,cy,ctm_setting)
-    global Lx,Ly
+def ob_onsite_iPESS(CTM,O1,B_set,T_set, double_B_set, double_T_set,cx,cy,Lx,Ly):
+ 
     pos_LU=[mod1(cx+1,Lx),mod1(cy+1,Ly)];
     pos_RU=[mod1(cx+2,Lx),mod1(cy+1,Ly)];
     pos_LD=[mod1(cx+1,Lx),mod1(cy+2,Ly)];
     pos_RD=[mod1(cx+2,Lx),mod1(cy+2,Ly)];
 
 
-    # @tensor A1[:]:= A_cell[pos_LU[1]][pos_LU[2]][-1,-2,-3,-4,1]*O1[-5,1]
+    # @tensor A1[:]:= A_cell[pos_LU[1-1]][pos_LU[2-1]][-1,-2,-3,-4,1]*O1[-5,1]
 
-    B_LU=B_set[pos_LU[1],pos_LU[2]];#(LU,M)
-    T_LU=T_set[pos_LU[1],pos_LU[2]];#(M,dRD)
-    B_LU0=deepcopy(B_LU);
-    T_LU0=deepcopy(T_LU);
+    B_LU=B_set[str(pos_LU[1-1])+','+str(pos_LU[2-1])];#(LU,M)
+    T_LU=T_set[str(pos_LU[1-1])+','+str(pos_LU[2-1])];#(M,dRD)
+    B_LU0=B_LU.clone();
+    T_LU0=T_LU.clone();
 
-    @tensor T_LU[:]:=T_LU[-1,1,-3,-4]*O1[-2,1];#M,d,R,D
+    # @tensor T_LU[:]:=T_LU[-1,1,-3,-4]*O1[-2,1];#M,d,R,D
+    T_LU=yastn.ncon([T_LU,O1], [[-1,1,-3,-4], [-2,1]]);
 
-    B_LU=permute(B_LU,(1,2,),(3,));
-    T_LU=permute(T_LU,(1,),(2,3,4,));
-    B_LU_double, _ = build_double_layer_swap_Tm(B_LU0',B_LU, false);#L M U
-    T_LU_double, _ = build_double_layer_swap_Bm(T_LU0',T_LU, true);#D R M
+    # B_LU=permute(B_LU,(1,2,),(3,));
+    # T_LU=permute(T_LU,(1,),(2,3,4,));
+    B_LU_double= build_double_layer_swap_Tm(B_LU0.conj(),B_LU, False);#L M U
+    T_LU_double= build_double_layer_swap_Bm(T_LU0.conj(),T_LU, True);#D R M
 
-    @tensor AA_LU[:]:=B_LU_double[-1,1,-4]*T_LU_double[-2,-3,1];
+    # @tensor AA_LU[:]:=B_LU_double[-1,1,-4]*T_LU_double[-2,-3,1];
+    AA_LU=yastn.ncon([B_LU_double,T_LU_double], [[-1,1,-4], [-2,-3,1]]);
     ##############################
     AA_LU0=get_AA_simple(double_B_set,double_T_set,pos_LU);
     AA_LD0=get_AA_simple(double_B_set,double_T_set,pos_LD);
     AA_RU0=get_AA_simple(double_B_set,double_T_set,pos_RU);
     AA_RD0=get_AA_simple(double_B_set,double_T_set,pos_RD);
 
-    ob=ob_2x2_iPESS(CTM,AA_LU, AA_RU0,AA_LD0,AA_RD0,cx,cy);
-    Norm=ob_2x2_iPESS(CTM,AA_LU0,AA_RU0,AA_LD0,AA_RD0,cx,cy);
+    ob=ob_2x2_iPESS(CTM,AA_LU, AA_RU0,AA_LD0,AA_RD0,cx,cy,Lx,Ly).to_number();
+    Norm=ob_2x2_iPESS(CTM,AA_LU0,AA_RU0,AA_LD0,AA_RD0,cx,cy,Lx,Ly).to_number();
     ob=ob/Norm;
     return ob
-end
 
-function hopping_x_iPESS(CTM,O1,O2,B_set,T_set, double_B_set, double_T_set,cx,cy,ctm_setting)
-    global Lx,Ly
+
+def hopping_x_iPESS(CTM,O1,O2,string12, B_set,T_set, double_B_set, double_T_set,cx,cy,Lx,Ly):
+
     pos_LU=[mod1(cx+1,Lx),mod1(cy+1,Ly)];
     pos_RU=[mod1(cx+2,Lx),mod1(cy+1,Ly)];
     pos_LD=[mod1(cx+1,Lx),mod1(cy+2,Ly)];
     pos_RD=[mod1(cx+2,Lx),mod1(cy+2,Ly)];
 
     #########################################
-    # @tensor A_LU[:]:= A_cell[pos_LU[1]][pos_LU[2]][-1,-2,-3,-4,1]*O1[-6,-5,1]
-    # gate=@ignore_derivatives parity_gate(A_LU,1); 
-    # @tensor A_LU[:]:=A_LU[1,-2,-3,-4,-5,-6]*gate[-1,1];
-    # gate=@ignore_derivatives parity_gate(A_LU,2); 
-    # @tensor A_LU[:]:=A_LU[-1,1,-3,-4,-5,-6]*gate[-2,1];
-    # gate=@ignore_derivatives parity_gate(A_LU,4); 
-    # @tensor A_LU[:]:=A_LU[-1,-2,-3,1,-5,-6]*gate[-4,1];
-    # U=@ignore_derivatives unitary(fuse(space(A_LU,3)⊗space(A_LU,6)), space(A_LU,3)⊗space(A_LU,6)); 
-    # @tensor A_LU[:]:=A_LU[-1,-2,1,-4,-5,2]*U[-3,1,2];
 
-    B_LU=B_set[pos_LU[1],pos_LU[2]];#(LU,M)
-    T_LU=T_set[pos_LU[1],pos_LU[2]];#(M,dRD)
-    B_LU0=deepcopy(B_LU);
-    T_LU0=deepcopy(T_LU);
+    B_LU=B_set[str(pos_LU[1-1])+','+str(pos_LU[2-1])];#(LU,M)
+    T_LU=T_set[str(pos_LU[1-1])+','+str(pos_LU[2-1])];#(M,dRD)
+    B_LU0=B_LU.clone();
+    T_LU0=T_LU.clone();
 
-    @tensor T_LU[:]:=T_LU[-1,1,-3,-4]*O1[-5,-2,1];#M,d,R,D,virtual
-    gate=@ignore_derivatives parity_gate(B_LU,1);#L 
-    @tensor B_LU[:]:=B_LU[1,-2,-3]*gate[-1,1];#L,U,M
-    gate=@ignore_derivatives parity_gate(T_LU,4); #D
-    @tensor T_LU[:]:=T_LU[-1,-2,-3,1,-5]*gate[-4,1];#M,d,R,D,virtual
-    gate=@ignore_derivatives parity_gate(B_LU,2);#U 
-    @tensor B_LU[:]:=B_LU[-1,1,-3]*gate[-2,1];#L,U,M
-    U=@ignore_derivatives unitary(fuse(space(T_LU,3)⊗space(T_LU,5)), space(T_LU,3)⊗space(T_LU,5)); 
-    @tensor T_LU[:]:=T_LU[-1,-2,1,-4,2]*U[-3,1,2];#M,d,R',D
+    #@tensor T_LU[:]:=T_LU[-1,1,-3,-4]*O1[-5,-2,1];#M,d,R,D,virtual
+    T_LU=yastn.ncon([T_LU,O1], [[-1,1,-3,-4], [-5,-2,1]]);
+    # gate=@ignore_derivatives parity_gate(B_LU,1);#L 
+    # @tensor B_LU[:]:=B_LU[1,-2,-3]*gate[-1,1];#L,U,M
+    B_LU=yastn.swap_gate(B_LU, (1-1,1-1));
+    # gate=@ignore_derivatives parity_gate(T_LU,4); #D
+    # @tensor T_LU[:]:=T_LU[-1,-2,-3,1,-5]*gate[-4,1];#M,d,R,D,virtual
+    T_LU=yastn.swap_gate(T_LU, (4-1,4-1));
+    # gate=@ignore_derivatives parity_gate(B_LU,2);#U 
+    # @tensor B_LU[:]:=B_LU[-1,1,-3]*gate[-2,1];#L,U,M
+    B_LU=yastn.swap_gate(B_LU, (2-1,2-1));
+    # U=@ignore_derivatives unitary(fuse(space(T_LU,3)⊗space(T_LU,5)), space(T_LU,3)⊗space(T_LU,5)); 
+    # @tensor T_LU[:]:=T_LU[-1,-2,1,-4,2]*U[-3,1,2];#M,d,R',D
+    T_LU=T_LU.fuse_legs((0,1,(2,4),3,), mode='hard');
 
-    B_LU=permute(B_LU,(1,2,),(3,));
-    T_LU=permute(T_LU,(1,),(2,3,4,));
-    B_LU_double, _ = build_double_layer_swap_Tm(B_LU0',B_LU, false);#L M U
-    T_LU_double, _ = build_double_layer_swap_Bm(T_LU0',T_LU, true);#D R M
+    # B_LU=permute(B_LU,(1,2,),(3,));
+    # T_LU=permute(T_LU,(1,),(2,3,4,));
+    B_LU_double= build_double_layer_swap_Tm(B_LU0.conj(),B_LU, False);#L M U
+    T_LU_double= build_double_layer_swap_Bm(T_LU0.conj(),T_LU, True);#D R M
     ###########################################
-    # @tensor A_RU[:]:= A_cell[pos_RU[1]][pos_RU[2]][-1,-2,-3,-4,1]*O2[-6,-5,1]
-    # gate=@ignore_derivatives parity_gate(A_RU,1); 
-    # @tensor A_RU[:]:=A_RU[1,-2,-3,-4,-5,-6]*gate[-1,1];
-    # gate=@ignore_derivatives parity_gate(A_RU,4); 
-    # @tensor A_RU[:]:=A_RU[-1,-2,-3,1,-5,-6]*gate[-4,1];
-    # @tensor A_RU[:]:=A_RU[1,-2,-3,-4,-5,2]*U'[1,2,-1];
 
-    B_RU=B_set[pos_RU[1],pos_RU[2]];#(LU,M)
-    T_RU=T_set[pos_RU[1],pos_RU[2]];#(M,dRD)
-    B_RU0=deepcopy(B_RU);
-    T_RU0=deepcopy(T_RU);
+    B_RU=B_set[str(pos_RU[1-1])+','+str(pos_RU[2-1])];#(LU,M)
+    T_RU=T_set[str(pos_RU[1-1])+','+str(pos_RU[2-1])];#(M,dRD)
+    B_RU0=B_RU.clone();
+    T_RU0=T_RU.clone();
 
-    @tensor T_RU[:]:= T_RU[-1,1,-3,-4]*O2[-5,-2,1];#M,d,R,D,virtual'
-    gate=@ignore_derivatives parity_gate(B_RU,1); #L
-    @tensor B_RU[:]:=B_RU[1,-2,-3]*gate[-1,1];#L,U,M
-    gate=@ignore_derivatives parity_gate(B_RU,2); #U
-    @tensor B_RU[:]:=B_RU[-1,1,-3]*gate[-2,1];#L,U,M
+    # @tensor T_RU[:]:= T_RU[-1,1,-3,-4]*O2[-5,-2,1];#M,d,R,D,virtual'
+    T_RU=yastn.ncon([T_RU,O2], [[-1,1,-3,-4], [-5,-2,1]]);
+    # gate=@ignore_derivatives parity_gate(B_RU,1); #L
+    # @tensor B_RU[:]:=B_RU[1,-2,-3]*gate[-1,1];#L,U,M
+    B_RU=yastn.swap_gate(B_RU, (1-1,1-1));
+    # gate=@ignore_derivatives parity_gate(B_RU,2); #U
+    # @tensor B_RU[:]:=B_RU[-1,1,-3]*gate[-2,1];#L,U,M
+    B_RU=yastn.swap_gate(B_RU, (2-1,2-1));
     
-    U2=@ignore_derivatives unitary(fuse(space(T_RU,1)⊗space(T_RU,5)), space(T_RU,1)⊗space(T_RU,5));
-    @tensor T_RU[:]:=T_RU[1,-2,-3,-4,2]*U2[-1,1,2];##M',d,R,D
+    # U2=@ignore_derivatives unitary(fuse(space(T_RU,1)⊗space(T_RU,5)), space(T_RU,1)⊗space(T_RU,5));
+    # @tensor T_RU[:]:=T_RU[1,-2,-3,-4,2]*U2[-1,1,2];#M',d,R,D
+    T_RU=T_RU.fuse_legs(((0,4),1,2,3,), mode='hard');
 
-    O_string=@ignore_derivatives unitary(space(O1,1)',space(O1,1)');
-    @tensor B_RU[:]:=B_RU[-1,-2,-3]*O_string[-4,-5];#(L,U,M), (virtual,virtual')=>(L,U,M, virtual,virtual')
-    @tensor B_RU[:]:=B_RU[1,-2,3,2,4]*U'[1,2,-1]*U2'[3,4,-3];#L,U,M
+    #O_string=@ignore_derivatives unitary(space(O1,1)',space(O1,1)');
+    # @tensor B_RU[:]:=B_RU[-1,-2,-3]*O_string[-4,-5];#(L,U,M), (virtual,virtual')=>(L,U,M, virtual,virtual')
+    B_RU=yastn.ncon([B_RU,string12], [[-1,-2,-3], [-4,-5]]);
+    # @tensor B_RU[:]:=B_RU[1,-2,3,2,4]*U'[1,2,-1]*U2'[3,4,-3];#L,U,M
+    B_RU=B_RU.fuse_legs(((0,3),1,(2,4)), mode='hard');
 
 
-    B_RU=permute(B_RU,(1,2,),(3,));
-    T_RU=permute(T_RU,(1,),(2,3,4,));
-    B_RU_double, _ = build_double_layer_swap_Tm(B_RU0',B_RU, false);#L M U
-    T_RU_double, _ = build_double_layer_swap_Bm(T_RU0',T_RU, true);#D R M
+    # B_RU=permute(B_RU,(1,2,),(3,));
+    # T_RU=permute(T_RU,(1,),(2,3,4,));
+    B_RU_double= build_double_layer_swap_Tm(B_RU0.conj(),B_RU, False);#L M U
+    T_RU_double= build_double_layer_swap_Bm(T_RU0.conj(),T_RU, True);#D R M
     ####################################
-    @tensor AA_LU[:]:=B_LU_double[-1,1,-4]*T_LU_double[-2,-3,1];
-    @tensor AA_RU[:]:=B_RU_double[-1,1,-4]*T_RU_double[-2,-3,1];
-    # return AA_LU,AA_RU
+    # @tensor AA_LU[:]:=B_LU_double[-1,1,-4]*T_LU_double[-2,-3,1];
+    # @tensor AA_RU[:]:=B_RU_double[-1,1,-4]*T_RU_double[-2,-3,1];
+    AA_LU=yastn.ncon([B_LU_double,T_LU_double], [[-1,1,-4], [-2,-3,1]]);
+    AA_RU=yastn.ncon([B_RU_double,T_RU_double], [[-1,1,-4], [-2,-3,1]]);
+
       
 
     AA_LU0=get_AA_simple(double_B_set,double_T_set,pos_LU);
@@ -409,194 +473,187 @@ function hopping_x_iPESS(CTM,O1,O2,B_set,T_set, double_B_set, double_T_set,cx,cy
     AA_RU0=get_AA_simple(double_B_set,double_T_set,pos_RU);
     AA_RD0=get_AA_simple(double_B_set,double_T_set,pos_RD);
 
-    ob=ob_2x2_iPESS(CTM,AA_LU,AA_RU,AA_LD0,AA_RD0,cx,cy);
-    Norm=ob_2x2_iPESS(CTM,AA_LU0,AA_RU0,AA_LD0,AA_RD0,cx,cy);
+    ob=ob_2x2_iPESS(CTM,AA_LU,AA_RU,AA_LD0,AA_RD0,cx,cy,Lx,Ly).to_number();
+    Norm=ob_2x2_iPESS(CTM,AA_LU0,AA_RU0,AA_LD0,AA_RD0,cx,cy,Lx,Ly).to_number();
     ob=ob/Norm;
     return ob
-end
 
-function hopping_y_iPESS(CTM,O1,O2,B_set,T_set, double_B_set, double_T_set,cx,cy,ctm_setting)
-    global Lx,Ly
+
+def hopping_y_iPESS(CTM,O1,O2,string12,B_set,T_set, double_B_set, double_T_set,cx,cy,Lx,Ly):
+
     pos_LU=[mod1(cx+1,Lx),mod1(cy+1,Ly)];
     pos_RU=[mod1(cx+2,Lx),mod1(cy+1,Ly)];
     pos_LD=[mod1(cx+1,Lx),mod1(cy+2,Ly)];
     pos_RD=[mod1(cx+2,Lx),mod1(cy+2,Ly)];
 
     #############################################
-    #the first index of O is dummy
-    # @tensor A_RU[:]:= A_cell[pos_RU[1]][pos_RU[2]][-1,-2,-3,-4,1]*O1[-6,-5,1]
-    # gate=@ignore_derivatives parity_gate(A_RU,1); 
-    # @tensor A_RU[:]:=A_RU[1,-2,-3,-4,-5,-6]*gate[-1,1];
-    # gate=@ignore_derivatives parity_gate(A_RU,2); 
-    # @tensor A_RU[:]:=A_RU[-1,1,-3,-4,-5,-6]*gate[-2,1];
-    # gate=@ignore_derivatives parity_gate(A_RU,4); 
-    # @tensor A_RU[:]:=A_RU[-1,-2,-3,1,-5,-6]*gate[-4,1];
-    # U1=@ignore_derivatives unitary(fuse(space(A_RU,2)⊗space(A_RU,6)), space(A_RU,2)⊗space(A_RU,6)); 
-    # @tensor A_RU[:]:=A_RU[-1,1,-3,-4,-5,2]*U1[-2,1,2];
     ####
-    B_RU=B_set[pos_RU[1],pos_RU[2]];#(LU,M)
-    T_RU=T_set[pos_RU[1],pos_RU[2]];#(M,dRD)
-    B_RU0=deepcopy(B_RU);
-    T_RU0=deepcopy(T_RU);
+    B_RU=B_set[str(pos_RU[1-1])+','+str(pos_RU[2-1])];#(LU,M)
+    T_RU=T_set[str(pos_RU[1-1])+','+str(pos_RU[2-1])];#(M,dRD)
+    B_RU0=B_RU.clone();
+    T_RU0=T_RU.clone();
 
-    @tensor T_RU[:]:= T_RU[-1,1,-3,-4]*O1[-5,-2,1];#M,d,R,D,virtual
-    gate=@ignore_derivatives parity_gate(B_RU,1); #L
-    @tensor B_RU[:]:=B_RU[1,-2,-3]*gate[-1,1];#L,U,M
-    gate=@ignore_derivatives parity_gate(T_RU,4); #D
-    @tensor T_RU[:]:=T_RU[-1,-2,-3,1,-5]*gate[-4,1];#M,d,R,D,virtual
-    gate=@ignore_derivatives parity_gate(B_RU,2); #U
-    @tensor B_RU[:]:=B_RU[-1,1,-3]*gate[-2,1];#L,U,M
-    U1=@ignore_derivatives unitary(fuse(space(T_RU,4)⊗space(T_RU,5)), space(T_RU,4)⊗space(T_RU,5)); 
-    @tensor T_RU[:]:=T_RU[-1,-2,-3,1,2]*U1[-4,1,2];#M,d,R,D'
+    # @tensor T_RU[:]:= T_RU[-1,1,-3,-4]*O1[-5,-2,1];#M,d,R,D,virtual
+    T_RU=yastn.ncon([T_RU,O1], [[-1,1,-3,-4], [-5,-2,1]]);
+    # gate=@ignore_derivatives parity_gate(B_RU,1); #L
+    # @tensor B_RU[:]:=B_RU[1,-2,-3]*gate[-1,1];#L,U,M
+    B_RU=yastn.swap_gate(B_RU, (1-1,1-1));
+    # gate=@ignore_derivatives parity_gate(T_RU,4); #D
+    # @tensor T_RU[:]:=T_RU[-1,-2,-3,1,-5]*gate[-4,1];#M,d,R,D,virtual
+    T_RU=yastn.swap_gate(T_RU, (4-1,4-1));
+    # gate=@ignore_derivatives parity_gate(B_RU,2); #U
+    # @tensor B_RU[:]:=B_RU[-1,1,-3]*gate[-2,1];#L,U,M
+    B_RU=yastn.swap_gate(B_RU, (2-1,2-1));
+    # U1=@ignore_derivatives unitary(fuse(space(T_RU,4)⊗space(T_RU,5)), space(T_RU,4)⊗space(T_RU,5)); 
+    # @tensor T_RU[:]:=T_RU[-1,-2,-3,1,2]*U1[-4,1,2];#M,d,R,D'
+    T_RU=T_RU.fuse_legs((0,1,2,(3,4)), mode='hard');
 
-    B_RU=permute(B_RU,(1,2,),(3,));
-    T_RU=permute(T_RU,(1,),(2,3,4,));
-    B_RU_double, _ = build_double_layer_swap_Tm(B_RU0',B_RU, false);#L M U
-    T_RU_double, _ = build_double_layer_swap_Bm(T_RU0',T_RU, true);#D R M
+    # B_RU=permute(B_RU,(1,2,),(3,));
+    # T_RU=permute(T_RU,(1,),(2,3,4,));
+    B_RU_double= build_double_layer_swap_Tm(B_RU0.conj(),B_RU, False);#L M U
+    T_RU_double= build_double_layer_swap_Bm(T_RU0.conj(),T_RU, True);#D R M
     ####################################
-    # @tensor A_RD[:]:= A_cell[pos_RD[1]][pos_RD[2]][-1,-2,-3,-4,1]*O2[-6,-5,1]
+    # @tensor A_RD[:]:= A_cell[pos_RD[1-1]][pos_RD[2-1]][-1,-2,-3,-4,1]*O2[-6,-5,1]
     # @tensor A_RD[:]:=A_RD[-1,-2,-3,1,-5,2]*U1'[1,2,-4];
     ####
-    B_RD=B_set[pos_RD[1],pos_RD[2]];#(LU,M)
-    T_RD=T_set[pos_RD[1],pos_RD[2]];#(M,dRD)
-    B_RD0=deepcopy(B_RD);
-    T_RD0=deepcopy(T_RD);
+    B_RD=B_set[str(pos_RD[1-1])+','+str(pos_RD[2-1])];#(LU,M)
+    T_RD=T_set[str(pos_RD[1-1])+','+str(pos_RD[2-1])];#(M,dRD)
+    B_RD0=B_RD.clone();
+    T_RD0=T_RD.clone();
 
     
-    @tensor T_RD[:]:= T_RD[-1,1,-3,-4]*O2[-5,-2,1];#M,d,R,D,virtual
-    U2=@ignore_derivatives unitary(fuse(space(T_RD,1)⊗space(T_RD,5)), space(T_RD,1)⊗space(T_RD,5));
-    @tensor T_RD[:]:=T_RD[1,-2,-3,-4,2]*U2[-1,1,2];#M',d,R,D
+    # @tensor T_RD[:]:= T_RD[-1,1,-3,-4]*O2[-5,-2,1];#M,d,R,D,virtual
+    T_RD=yastn.ncon([T_RD,O2], [[-1,1,-3,-4], [-5,-2,1]]);
+    # U2=@ignore_derivatives unitary(fuse(space(T_RD,1)⊗space(T_RD,5)), space(T_RD,1)⊗space(T_RD,5));
+    # @tensor T_RD[:]:=T_RD[1,-2,-3,-4,2]*U2[-1,1,2];#M',d,R,D
+    T_RD=T_RD.fuse_legs(((0,4),1,2,3), mode='hard');
 
-    O_string=@ignore_derivatives unitary(space(O1,1)',space(O1,1)');
-    @tensor B_RD[:]:= B_RD[-1,-2,-3]*O_string[-4,-5];#(L,U,M), (virtual',virtual)=>(L,U,M, virtual',virtual)
-    @tensor B_RD[:]:=B_RD[-1,1,3,2,4]*U1'[1,2,-2]*U2'[3,4,-3];#L,U,M
+    # O_string=@ignore_derivatives unitary(space(O1,1)',space(O1,1)');
+    # @tensor B_RD[:]:= B_RD[-1,-2,-3]*O_string[-4,-5];#(L,U,M), (virtual',virtual)=>(L,U,M, virtual',virtual)
+    B_RD=yastn.ncon([B_RD,string12], [[-1,-2,-3], [-4,-5]]);
+    # @tensor B_RD[:]:=B_RD[-1,1,3,2,4]*U1'[1,2,-2]*U2'[3,4,-3];#L,U,M
+    B_RD=B_RD.fuse_legs((0,(1,3),(2,4)), mode='hard');
 
-    B_RD=permute(B_RD,(1,2,),(3,));
-    T_RD=permute(T_RD,(1,),(2,3,4,));
+    # B_RD=permute(B_RD,(1,2,),(3,));
+    # T_RD=permute(T_RD,(1,),(2,3,4,));
 
-    B_RD_double, _ = build_double_layer_swap_Tm(B_RD0',B_RD, false);#L M U
-    T_RD_double, _ = build_double_layer_swap_Bm(T_RD0',T_RD, true);#D R M
+    B_RD_double= build_double_layer_swap_Tm(B_RD0.conj(),B_RD, False);#L M U
+    T_RD_double= build_double_layer_swap_Bm(T_RD0.conj(),T_RD, True);#D R M
     ###################################################
-    @tensor AA_RU[:]:=B_RU_double[-1,1,-4]*T_RU_double[-2,-3,1];
-    @tensor AA_RD[:]:=B_RD_double[-1,1,-4]*T_RD_double[-2,-3,1];
-    # return AA_RU,AA_RD
-
+    # @tensor AA_RU[:]:=B_RU_double[-1,1,-4]*T_RU_double[-2,-3,1];
+    # @tensor AA_RD[:]:=B_RD_double[-1,1,-4]*T_RD_double[-2,-3,1];
+    AA_RU=yastn.ncon([B_RU_double,T_RU_double], [[-1,1,-4], [-2,-3,1]]);
+    AA_RD=yastn.ncon([B_RD_double,T_RD_double], [[-1,1,-4], [-2,-3,1]]);
 
     AA_LU0=get_AA_simple(double_B_set,double_T_set,pos_LU);
     AA_LD0=get_AA_simple(double_B_set,double_T_set,pos_LD);
     AA_RU0=get_AA_simple(double_B_set,double_T_set,pos_RU);
     AA_RD0=get_AA_simple(double_B_set,double_T_set,pos_RD);
     
-    ob=ob_2x2_iPESS(CTM,AA_LU0,AA_RU,AA_LD0,AA_RD,cx,cy);
-    Norm=ob_2x2_iPESS(CTM,AA_LU0,AA_RU0,AA_LD0,AA_RD0,cx,cy);
+    ob=ob_2x2_iPESS(CTM,AA_LU0,AA_RU,AA_LD0,AA_RD,cx,cy,Lx,Ly).to_number();
+    Norm=ob_2x2_iPESS(CTM,AA_LU0,AA_RU0,AA_LD0,AA_RD0,cx,cy,Lx,Ly).to_number();
     ob=ob/Norm;
     return ob
-end
 
-function hopping_diagonala_iPESS(CTM,O1,O2,B_set,T_set, double_B_set, double_T_set, cx,cy,ctm_setting)
-    global Lx,Ly
+
+def hopping_diagonala_iPESS(CTM,O1,O2,string12,B_set,T_set, double_B_set, double_T_set, cx,cy,Lx,Ly):
+
     pos_LU=[mod1(cx+1,Lx),mod1(cy+1,Ly)];
     pos_RU=[mod1(cx+2,Lx),mod1(cy+1,Ly)];
     pos_LD=[mod1(cx+1,Lx),mod1(cy+2,Ly)];
     pos_RD=[mod1(cx+2,Lx),mod1(cy+2,Ly)];
 
     ###################################################
-
-    # @tensor A_LD[:]:= A_cell[pos_LD[1]][pos_LD[2]][-1,-2,-3,-4,1]*O1[-6,-5,1]
-    # gate=@ignore_derivatives parity_gate(A_LD,1); #L
-    # @tensor A_LD[:]:=A_LD[1,-2,-3,-4,-5,-6]*gate[-1,1];
-    # gate=@ignore_derivatives parity_gate(A_LD,2); #D
-    # @tensor A_LD[:]:=A_LD[-1,1,-3,-4,-5,-6]*gate[-2,1];
-    # gate=@ignore_derivatives parity_gate(A_LD,4); #U
-    # @tensor A_LD[:]:=A_LD[-1,-2,-3,1,-5,-6]*gate[-4,1];
-    # U1=@ignore_derivatives unitary(fuse(space(A_LD,3)⊗space(A_LD,6)), space(A_LD,3)⊗space(A_LD,6)); 
-    # @tensor A_LD[:]:=A_LD[-1,-2,1,-4,-5,2]*U1[-3,1,2];
     ######
-    B_LD=B_set[pos_LD[1],pos_LD[2]];#(LU,M)
-    T_LD=T_set[pos_LD[1],pos_LD[2]];#(M,dRD)
-    B_LD0=deepcopy(B_LD);
-    T_LD0=deepcopy(T_LD);
+    B_LD=B_set[str(pos_LD[1-1])+','+str(pos_LD[2-1])];#(LU,M)
+    T_LD=T_set[str(pos_LD[1-1])+','+str(pos_LD[2-1])];#(M,dRD)
+    B_LD0=B_LD.clone();
+    T_LD0=T_LD.clone();
 
-    @tensor T_LD[:]:= T_LD[-1,1,-2,-3]*O1[-5,-4,1];#M,R,D,d,virtual
-    gate=@ignore_derivatives parity_gate(B_LD,1); #L
-    @tensor B_LD[:]:=B_LD[1,-2,-3]*gate[-1,1];#L,U,M
-    gate=@ignore_derivatives parity_gate(T_LD,3); #D
-    @tensor T_LD[:]:=T_LD[-1,-2,1,-4,-5]*gate[-3,1];#M,R,D,d,virtual
-    gate=@ignore_derivatives parity_gate(B_LD,2); #U
-    @tensor B_LD[:]:=B_LD[-1,1,-3]*gate[-2,1];#L,U,M
-    U1=@ignore_derivatives unitary(fuse(space(T_LD,2)⊗space(T_LD,5)), space(T_LD,2)⊗space(T_LD,5)); 
-    @tensor T_LD[:]:=T_LD[-1,1,-3,-4,2]*U1[-2,1,2];#M,R',D,d
-    T_LD=permute(T_LD,(1,4,2,3,));#M,d,R',D
+    # @tensor T_LD[:]:= T_LD[-1,1,-2,-3]*O1[-5,-4,1];#M,R,D,d,virtual
+    T_LD=yastn.ncon([T_LD,O1], [[-1,1,-2,-3], [-5,-4,1]]);
+    # gate=@ignore_derivatives parity_gate(B_LD,1); #L
+    # @tensor B_LD[:]:=B_LD[1,-2,-3]*gate[-1,1];#L,U,M
+    B_LD=yastn.swap_gate(B_LD, (1-1,1-1));
+    # gate=@ignore_derivatives parity_gate(T_LD,3); #D
+    # @tensor T_LD[:]:=T_LD[-1,-2,1,-4,-5]*gate[-3,1];#M,R,D,d,virtual
+    T_LD=yastn.swap_gate(T_LD, (3-1,3-1));
+    # gate=@ignore_derivatives parity_gate(B_LD,2); #U
+    # @tensor B_LD[:]:=B_LD[-1,1,-3]*gate[-2,1];#L,U,M
+    B_LD=yastn.swap_gate(B_LD, (2-1,2-1));
+    # U1=@ignore_derivatives unitary(fuse(space(T_LD,2)⊗space(T_LD,5)), space(T_LD,2)⊗space(T_LD,5)); 
+    # @tensor T_LD[:]:=T_LD[-1,1,-3,-4,2]*U1[-2,1,2];#M,R',D,d
+    T_LD=T_LD.fuse_legs((0,(1,4),2,3), mode='hard');
+    # T_LD=permute(T_LD,(1,4,2,3,));#M,d,R',D
+    T_LD=yastn.transpose(T_LD, axes=(1-1,4-1,2-1,3-1));
 
-    B_LD=permute(B_LD,(1,2,),(3,));
-    T_LD=permute(T_LD,(1,),(2,3,4,));
+    # B_LD=permute(B_LD,(1,2,),(3,));
+    # T_LD=permute(T_LD,(1,),(2,3,4,));
 
-    B_LD_double, _ = build_double_layer_swap_Tm(B_LD0',B_LD, false);#L M U
-    T_LD_double, _ = build_double_layer_swap_Bm(T_LD0',T_LD, true);#D R M
+    B_LD_double= build_double_layer_swap_Tm(B_LD0.conj(),B_LD, False);#L M U
+    T_LD_double= build_double_layer_swap_Bm(T_LD0.conj(),T_LD, True);#D R M
 
     #############################################
-    # @tensor A_RU[:]:= A_cell[pos_RU[1]][pos_RU[2]][-1,-2,-3,-4,1]*O2[-6,-5,1]
-    # gate=@ignore_derivatives parity_gate(A_RU,3); #R
-    # @tensor A_RU[:]:=A_RU[-1,-2,1,-4,-5,-6]*gate[-3,1];
-    # gate=@ignore_derivatives parity_gate(A_RU,5); #d
-    # @tensor A_RU[:]:=A_RU[-1,-2,-3,-4,1,-6]*gate[-5,1];
-    # U2=@ignore_derivatives unitary(fuse(space(A_RU,2)⊗space(A_RU,6)), space(A_RU,2)⊗space(A_RU,6)); 
-    # @tensor A_RU[:]:=A_RU[-1,1,-3,-4,-5,2]*U2[-2,1,2];
     ######
-    B_RU=B_set[pos_RU[1],pos_RU[2]];#(LU,M)
-    T_RU=T_set[pos_RU[1],pos_RU[2]];#(M,dRD)
-    B_RU0=deepcopy(B_RU);
-    T_RU0=deepcopy(T_RU);
+    B_RU=B_set[str(pos_RU[1-1])+','+str(pos_RU[2-1])];#(LU,M)
+    T_RU=T_set[str(pos_RU[1-1])+','+str(pos_RU[2-1])];#(M,dRD)
+    B_RU0=B_RU.clone();
+    T_RU0=T_RU.clone();
 
-    @tensor T_RU[:]:= T_RU[-1,1,-2,-3]*O2[-5,-4,1];#M,R,D,d,virtual
-    gate=@ignore_derivatives parity_gate(T_RU,2); #R
-    @tensor T_RU[:]:=T_RU[-1,1,-3,-4,-5]*gate[-2,1];
-    gate=@ignore_derivatives parity_gate(T_RU,4); #d
-    @tensor T_RU[:]:=T_RU[-1,-2,-3,1,-5]*gate[-4,1];
-    U2=@ignore_derivatives unitary(fuse(space(T_RU,3)⊗space(T_RU,5)), space(T_RU,3)⊗space(T_RU,5)); 
-    @tensor T_RU[:]:=T_RU[-1,-2,1,-4,2]*U2[-3,1,2];#M,R,D',d
-    T_RU=permute(T_RU,(1,4,2,3,));#M,d,R,D
+    # @tensor T_RU[:]:= T_RU[-1,1,-2,-3]*O2[-5,-4,1];#M,R,D,d,virtual
+    T_RU=yastn.ncon([T_RU,O2], [[-1,1,-2,-3], [-5,-4,1]]);
+    # gate=@ignore_derivatives parity_gate(T_RU,2); #R
+    # @tensor T_RU[:]:=T_RU[-1,1,-3,-4,-5]*gate[-2,1];
+    T_RU=yastn.swap_gate(T_RU, (2-1,2-1));
+    # gate=@ignore_derivatives parity_gate(T_RU,4); #d
+    # @tensor T_RU[:]:=T_RU[-1,-2,-3,1,-5]*gate[-4,1];
+    T_RU=yastn.swap_gate(T_RU, (4-1,4-1));
+    # U2=@ignore_derivatives unitary(fuse(space(T_RU,3)⊗space(T_RU,5)), space(T_RU,3)⊗space(T_RU,5)); 
+    # @tensor T_RU[:]:=T_RU[-1,-2,1,-4,2]*U2[-3,1,2];#M,R,D',d
+    T_RU=T_RU.fuse_legs((0,1,(2,4),3), mode='hard');
+    # T_RU=permute(T_RU,(1,4,2,3,));#M,d,R,D
+    T_RU=yastn.transpose(T_RU, axes=(1-1,4-1,2-1,3-1));
 
-    B_RU=permute(B_RU,(1,2,),(3,));
-    T_RU=permute(T_RU,(1,),(2,3,4,));
+    # B_RU=permute(B_RU,(1,2,),(3,));
+    # T_RU=permute(T_RU,(1,),(2,3,4,));
 
-    B_RU_double, _ = build_double_layer_swap_Tm(B_RU0',B_RU, false);#L M U
-    T_RU_double, _ = build_double_layer_swap_Bm(T_RU0',T_RU, true);#D R M
+    B_RU_double= build_double_layer_swap_Tm(B_RU0.conj(),B_RU, False);#L M U
+    T_RU_double= build_double_layer_swap_Bm(T_RU0.conj(),T_RU, True);#D R M
     ################################################
+    ######
+    B_RD=B_set[str(pos_RD[1-1])+','+str(pos_RD[2-1])];#(LU,M)
+    T_RD=T_set[str(pos_RD[1-1])+','+str(pos_RD[2-1])];#(M,dRD)
+    B_RD0=B_RD.clone();
+    T_RD0=T_RD.clone();
+
+    
+    # gate=@ignore_derivatives parity_gate(T_RD,4); # D
+    # @tensor T_RD[:]:=T_RD[-1,-2,-3,1]*gate[-4,1];#M,d,R,D
+    T_RD=yastn.swap_gate(T_RD, (4-1,4-1));
+    # gate=@ignore_derivatives parity_gate(T_RD,3); # R
+    # @tensor T_RD[:]:=T_RD[-1,-2,1,-4]*gate[-3,1];#M,d,R,D
+    T_RD=yastn.swap_gate(T_RD, (3-1,3-1));
+    # gate=@ignore_derivatives parity_gate(T_RD,2); # d
+    # @tensor T_RD[:]:=T_RD[-1,1,-3,-4]*gate[-2,1];#M,d,R,D
+    T_RD=yastn.swap_gate(T_RD, (2-1,2-1));
     # O_string=@ignore_derivatives unitary(space(O1,1),space(O1,1));
-    # gate=@ignore_derivatives parity_gate(A_cell[pos_RD[1]][pos_RD[2]],2); # D
-    # @tensor A_RD[:]:=A_cell[pos_RD[1]][pos_RD[2]][-1,1,-3,-4,-5]*gate[-2,1];
-    # gate=@ignore_derivatives parity_gate(A_RD,3); # R
-    # @tensor A_RD[:]:=A_RD[-1,-2,1,-4,-5]*gate[-3,1];
-    # gate=@ignore_derivatives parity_gate(A_RD,5); # d
-    # @tensor A_RD[:]:=A_RD[-1,-2,-3,-4,1]*gate[-5,1];
-    # @tensor A_RD[:]:=A_RD[1,-2,-3,3,-5]*O_string[4,2]*U1'[1,2,-1]*U2'[3,4,-4];
-    ######
-    B_RD=B_set[pos_RD[1],pos_RD[2]];#(LU,M)
-    T_RD=T_set[pos_RD[1],pos_RD[2]];#(M,dRD)
-    B_RD0=deepcopy(B_RD);
-    T_RD0=deepcopy(T_RD);
-
-    O_string=@ignore_derivatives unitary(space(O1,1),space(O1,1));
-    gate=@ignore_derivatives parity_gate(T_RD,4); # D
-    @tensor T_RD[:]:=T_RD[-1,-2,-3,1]*gate[-4,1];#M,d,R,D
-    gate=@ignore_derivatives parity_gate(T_RD,3); # R
-    @tensor T_RD[:]:=T_RD[-1,-2,1,-4]*gate[-3,1];#M,d,R,D
-    gate=@ignore_derivatives parity_gate(T_RD,2); # d
-    @tensor T_RD[:]:=T_RD[-1,1,-3,-4]*gate[-2,1];#M,d,R,D
-    @tensor B_RD[:]:=B_RD[1,3,-3]*O_string[4,2]*U1'[1,2,-1]*U2'[3,4,-2];#L,U,M
+    # @tensor B_RD[:]:=B_RD[1,3,-3]*O_string[4,2]*U1'[1,2,-1]*U2'[3,4,-2];#L,U,M
+    B_RD=yastn.ncon([B_RD,string12], [[-1,-2,-3], [-4,-5]]);
+    B_RD=B_RD.fuse_legs(((0,3),(1,4),2), mode='hard');
 
 
-    B_RD=permute(B_RD,(1,2,),(3,));
-    T_RD=permute(T_RD,(1,),(2,3,4,));
+    # B_RD=permute(B_RD,(1,2,),(3,));
+    # T_RD=permute(T_RD,(1,),(2,3,4,));
 
-    B_RD_double, _ = build_double_layer_swap_Tm(B_RD0',B_RD, false);#L M U
-    T_RD_double, _ = build_double_layer_swap_Bm(T_RD0',T_RD, true);#D R M
+    B_RD_double= build_double_layer_swap_Tm(B_RD0.conj(),B_RD, False);#L M U
+    T_RD_double= build_double_layer_swap_Bm(T_RD0.conj(),T_RD, True);#D R M
     ################################################
-    @tensor AA_LD[:]:=B_LD_double[-1,1,-4]*T_LD_double[-2,-3,1];
-    @tensor AA_RU[:]:=B_RU_double[-1,1,-4]*T_RU_double[-2,-3,1];
-    @tensor AA_RD[:]:=B_RD_double[-1,1,-4]*T_RD_double[-2,-3,1];
-    # return AA_LD,AA_RU,AA_RD
+    # @tensor AA_LD[:]:=B_LD_double[-1,1,-4]*T_LD_double[-2,-3,1];
+    # @tensor AA_RU[:]:=B_RU_double[-1,1,-4]*T_RU_double[-2,-3,1];
+    # @tensor AA_RD[:]:=B_RD_double[-1,1,-4]*T_RD_double[-2,-3,1];
+    AA_LD=yastn.ncon([B_LD_double,T_LD_double], [[-1,1,-4], [-2,-3,1]]);
+    AA_RU=yastn.ncon([B_RU_double,T_RU_double], [[-1,1,-4], [-2,-3,1]]);
+    AA_RD=yastn.ncon([B_RD_double,T_RD_double], [[-1,1,-4], [-2,-3,1]]);
     ################################################
 
     AA_LU0=get_AA_simple(double_B_set,double_T_set,pos_LU);
@@ -604,661 +661,557 @@ function hopping_diagonala_iPESS(CTM,O1,O2,B_set,T_set, double_B_set, double_T_s
     AA_RU0=get_AA_simple(double_B_set,double_T_set,pos_RU);
     AA_RD0=get_AA_simple(double_B_set,double_T_set,pos_RD);
 
-    ob=ob_2x2_iPESS(CTM,AA_LU0,AA_RU,AA_LD,AA_RD,cx,cy);
-    Norm=ob_2x2_iPESS(CTM,AA_LU0,AA_RU0,AA_LD0,AA_RD0,cx,cy);
+    ob=ob_2x2_iPESS(CTM,AA_LU0,AA_RU,AA_LD,AA_RD,cx,cy,Lx,Ly).to_number();
+    Norm=ob_2x2_iPESS(CTM,AA_LU0,AA_RU0,AA_LD0,AA_RD0,cx,cy,Lx,Ly).to_number();
     ob=ob/Norm;
     return ob        
-end
-
-###################################################################################
-#spin observable
-
-function ob_dn_triangle_iPESS(CTM,S1,S2,S3,B_set,T_set, double_B_set, double_T_set,cx,cy,ctm_setting)
-    global Lx,Ly
-    pos_LU=[mod1(cx+1,Lx),mod1(cy+1,Ly)];
-    pos_RU=[mod1(cx+2,Lx),mod1(cy+1,Ly)];
-    pos_LD=[mod1(cx+1,Lx),mod1(cy+2,Ly)];
-    pos_RD=[mod1(cx+2,Lx),mod1(cy+2,Ly)];
-
-    ####################
-
-    B_LD=B_set[pos_LD[1],pos_LD[2]];#(LU,M)
-    T_LD=T_set[pos_LD[1],pos_LD[2]];#(M,dRD)
-    B_LD0=deepcopy(B_LD);
-    T_LD0=deepcopy(T_LD);
 
 
-    @tensor T_LD[:]:= T_LD[-1,1,-3,-4]*S1[-2,1,-5];#M,d,R,D,virtual
-    U10=@ignore_derivatives unitary(fuse(space(T_LD,1)⊗space(T_LD,5)), space(T_LD,1)⊗space(T_LD,5)); 
-    @tensor T_LD[:]:=T_LD[1,-2,-3,-4,2]*U10[-1,1,2];#M',d,R,D
+# ###################################################################################
+# #spin observable
 
-    String1=unitary(space(S1,3),space(S1,3));
-    U1=@ignore_derivatives unitary(fuse(space(B_LD,2)⊗space(String1,1)), space(B_LD,2)⊗space(String1,1)); 
-    @tensor B_LD[:]:=B_LD[-1,1,3]*String1[2,4]*U10'[3,4,-3]*U1[-2,1,2];#L,U,M
+# def ob_dn_triangle_iPESS(CTM,S1,S2,S3,string12, string23, B_set,T_set, double_B_set, double_T_set,cx,cy,Lx,Ly):
 
-    B_LD=permute(B_LD,(1,2,),(3,));
-    T_LD=permute(T_LD,(1,),(2,3,4,));
+#     pos_LU=[mod1(cx+1,Lx),mod1(cy+1,Ly)];
+#     pos_RU=[mod1(cx+2,Lx),mod1(cy+1,Ly)];
+#     pos_LD=[mod1(cx+1,Lx),mod1(cy+2,Ly)];
+#     pos_RD=[mod1(cx+2,Lx),mod1(cy+2,Ly)];
 
-    B_LD_double, _ = build_double_layer_swap_Tm(B_LD0',B_LD, false);#L M U
-    T_LD_double, _ = build_double_layer_swap_Bm(T_LD0',T_LD, true);#D R M
-    ####################
+#     ####################
 
-    B_RU=B_set[pos_RU[1],pos_RU[2]];#(LU,M)
-    T_RU=T_set[pos_RU[1],pos_RU[2]];#(M,dRD)
-    B_RU0=deepcopy(B_RU);
-    T_RU0=deepcopy(T_RU);
+#     B_LD=B_set[str(pos_LD[1-1])+','+str(pos_LD[2-1])];#(LU,M)
+#     T_LD=T_set[str(pos_LD[1-1])+','+str(pos_LD[2-1])];#(M,dRD)
+#     B_LD0=B_LD.clone();
+#     T_LD0=T_LD.clone();
 
-    @tensor T_RU[:]:= T_RU[-1,1,-3,-4]*S3[-5,-2,1];#M,d,R,D,virtual
-    U20=@ignore_derivatives unitary(fuse(space(T_RU,1)⊗space(T_RU,5)), space(T_RU,1)⊗space(T_RU,5)); 
-    @tensor T_RU[:]:=T_RU[1,-2,-3,-4,2]*U20[-1,1,2];
 
-    String2=unitary(space(S3,1),space(S3,1));
-    U2=@ignore_derivatives unitary(fuse(space(B_RU,1)⊗space(String2,1)), space(B_RU,1)⊗space(String2,1)); 
-    @tensor B_RU[:]:=B_RU[1,-2,3]*String2[2,4]*U2[-1,1,2]*U20'[3,4,-3];
+#     @tensor T_LD[:]:= T_LD[-1,1,-3,-4]*S1[-2,1,-5];#M,d,R,D,virtual
+#     U10=@ignore_derivatives unitary(fuse(space(T_LD,1)⊗space(T_LD,5)), space(T_LD,1)⊗space(T_LD,5)); 
+#     @tensor T_LD[:]:=T_LD[1,-2,-3,-4,2]*U10[-1,1,2];#M',d,R,D
 
-    B_RU=permute(B_RU,(1,2,),(3,));
-    T_RU=permute(T_RU,(1,),(2,3,4,));
+#     String1=unitary(space(S1,3),space(S1,3));
+#     U1=@ignore_derivatives unitary(fuse(space(B_LD,2)⊗space(String1,1)), space(B_LD,2)⊗space(String1,1)); 
+#     @tensor B_LD[:]:=B_LD[-1,1,3]*String1[2,4]*U10'[3,4,-3]*U1[-2,1,2];#L,U,M
 
-    B_RU_double, _ = build_double_layer_swap_Tm(B_RU0',B_RU, false);#L M U
-    T_RU_double, _ = build_double_layer_swap_Bm(T_RU0',T_RU, true);#D R M
-    ####################
-    B_LU=B_set[pos_LU[1],pos_LU[2]];#(LU,M)
-    T_LU=T_set[pos_LU[1],pos_LU[2]];#(M,dRD)
-    B_LU0=deepcopy(B_LU);
-    T_LU0=deepcopy(T_LU);
+#     B_LD=permute(B_LD,(1,2,),(3,));
+#     T_LD=permute(T_LD,(1,),(2,3,4,));
 
-    @tensor T_LU[:]:=T_LU[-1,1,2,4]*S2[5,-2,1,3]*U1'[4,5,-4]*U2'[2,3,-3];
+#     B_LD_double= build_double_layer_swap_Tm(B_LD0.conj(),B_LD, False);#L M U
+#     T_LD_double= build_double_layer_swap_Bm(T_LD0.conj(),T_LD, True);#D R M
+#     ####################
 
-    B_LU=permute(B_LU,(1,2,),(3,));
-    T_LU=permute(T_LU,(1,),(2,3,4,));
+#     B_RU=B_set[str(pos_RU[1-1])+','+str(pos_RU[2-1])];#(LU,M)
+#     T_RU=T_set[str(pos_RU[1-1])+','+str(pos_RU[2-1])];#(M,dRD)
+#     B_RU0=B_RU.clone();
+#     T_RU0=T_RU.clone();
 
-    B_LU_double, _ = build_double_layer_swap_Tm(B_LU0',B_LU, false);#L M U
-    T_LU_double, _ = build_double_layer_swap_Bm(T_LU0',T_LU, true);#D R M
-    ####################
+#     @tensor T_RU[:]:= T_RU[-1,1,-3,-4]*S3[-5,-2,1];#M,d,R,D,virtual
+#     U20=@ignore_derivatives unitary(fuse(space(T_RU,1)⊗space(T_RU,5)), space(T_RU,1)⊗space(T_RU,5)); 
+#     @tensor T_RU[:]:=T_RU[1,-2,-3,-4,2]*U20[-1,1,2];
 
-    @tensor AA_LD[:]:=B_LD_double[-1,1,-4]*T_LD_double[-2,-3,1];
-    @tensor AA_RU[:]:=B_RU_double[-1,1,-4]*T_RU_double[-2,-3,1];
-    @tensor AA_LU[:]:=B_LU_double[-1,1,-4]*T_LU_double[-2,-3,1];
+#     String2=unitary(space(S3,1),space(S3,1));
+#     U2=@ignore_derivatives unitary(fuse(space(B_RU,1)⊗space(String2,1)), space(B_RU,1)⊗space(String2,1)); 
+#     @tensor B_RU[:]:=B_RU[1,-2,3]*String2[2,4]*U2[-1,1,2]*U20'[3,4,-3];
+
+#     B_RU=permute(B_RU,(1,2,),(3,));
+#     T_RU=permute(T_RU,(1,),(2,3,4,));
+
+#     B_RU_double= build_double_layer_swap_Tm(B_RU0.conj(),B_RU, False);#L M U
+#     T_RU_double= build_double_layer_swap_Bm(T_RU0.conj(),T_RU, True);#D R M
+#     ####################
+#     B_LU=B_set[str(pos_LU[1-1])+','+str(pos_LU[2-1])];#(LU,M)
+#     T_LU=T_set[str(pos_LU[1-1])+','+str(pos_LU[2-1])];#(M,dRD)
+#     B_LU0=B_LU.clone();
+#     T_LU0=T_LU.clone();
+
+#     @tensor T_LU[:]:=T_LU[-1,1,2,4]*S2[5,-2,1,3]*U1'[4,5,-4]*U2'[2,3,-3];
+
+#     B_LU=permute(B_LU,(1,2,),(3,));
+#     T_LU=permute(T_LU,(1,),(2,3,4,));
+
+#     B_LU_double= build_double_layer_swap_Tm(B_LU0.conj(),B_LU, False);#L M U
+#     T_LU_double= build_double_layer_swap_Bm(T_LU0.conj(),T_LU, True);#D R M
+#     ####################
+
+#     @tensor AA_LD[:]:=B_LD_double[-1,1,-4]*T_LD_double[-2,-3,1];
+#     @tensor AA_RU[:]:=B_RU_double[-1,1,-4]*T_RU_double[-2,-3,1];
+#     @tensor AA_LU[:]:=B_LU_double[-1,1,-4]*T_LU_double[-2,-3,1];
     
-    ################################################
+#     ################################################
 
-    AA_LU0=get_AA_simple(double_B_set,double_T_set,pos_LU);
-    AA_LD0=get_AA_simple(double_B_set,double_T_set,pos_LD);
-    AA_RU0=get_AA_simple(double_B_set,double_T_set,pos_RU);
-    AA_RD0=get_AA_simple(double_B_set,double_T_set,pos_RD);
+#     AA_LU0=get_AA_simple(double_B_set,double_T_set,pos_LU);
+#     AA_LD0=get_AA_simple(double_B_set,double_T_set,pos_LD);
+#     AA_RU0=get_AA_simple(double_B_set,double_T_set,pos_RU);
+#     AA_RD0=get_AA_simple(double_B_set,double_T_set,pos_RD);
 
-    ob=ob_2x2_iPESS(CTM,AA_LU,AA_RU,AA_LD,AA_RD0,cx,cy);
-    Norm=ob_2x2_iPESS(CTM,AA_LU0,AA_RU0,AA_LD0,AA_RD0,cx,cy);
-    ob=ob/Norm;
-    return ob        
-end
-
-function ob_up_triangle_iPESS(CTM,S1,S2,S3,B_set,T_set, double_B_set, double_T_set,cx,cy,ctm_setting)
-    global Lx,Ly
-    pos_LU=[mod1(cx+1,Lx),mod1(cy+1,Ly)];
-    pos_RU=[mod1(cx+2,Lx),mod1(cy+1,Ly)];
-    pos_LD=[mod1(cx+1,Lx),mod1(cy+2,Ly)];
-    pos_RD=[mod1(cx+2,Lx),mod1(cy+2,Ly)];
+#     ob=ob_2x2_iPESS(CTM,AA_LU,AA_RU,AA_LD,AA_RD0,cx,cy,Lx,Ly).to_number();
+#     Norm=ob_2x2_iPESS(CTM,AA_LU0,AA_RU0,AA_LD0,AA_RD0,cx,cy,Lx,Ly).to_number();
+#     ob=ob/Norm;
+#     return ob        
 
 
+# def ob_up_triangle_iPESS(CTM,S1,S2,S3,string12, string23, B_set,T_set, double_B_set, double_T_set,cx,cy,Lx,Ly):
 
-    B_LD=B_set[pos_LD[1],pos_LD[2]];#(LU,M)
-    T_LD=T_set[pos_LD[1],pos_LD[2]];#(M,dRD)
-    B_LD0=deepcopy(B_LD);
-    T_LD0=deepcopy(T_LD);
+#     pos_LU=[mod1(cx+1,Lx),mod1(cy+1,Ly)];
+#     pos_RU=[mod1(cx+2,Lx),mod1(cy+1,Ly)];
+#     pos_LD=[mod1(cx+1,Lx),mod1(cy+2,Ly)];
+#     pos_RD=[mod1(cx+2,Lx),mod1(cy+2,Ly)];
 
-    @tensor T_LD[:]:= T_LD[-1,1,-2,-3]*S1[-4,1,-5];#M,R,D,d,virtual
-    U1=@ignore_derivatives unitary(fuse(space(T_LD,2)⊗space(T_LD,5)), space(T_LD,2)⊗space(T_LD,5)); 
-    @tensor T_LD[:]:=T_LD[-1,1,-3,-4,2]*U1[-2,1,2];#M,R',D,d
-    T_LD=permute(T_LD,(1,4,2,3,));#M,d,R',D
+#     B_LD=B_set[str(pos_LD[1-1])+','+str(pos_LD[2-1])];#(LU,M)
+#     T_LD=T_set[str(pos_LD[1-1])+','+str(pos_LD[2-1])];#(M,dRD)
+#     B_LD0=B_LD.clone();
+#     T_LD0=T_LD.clone();
 
-    B_LD=permute(B_LD,(1,2,),(3,));
-    T_LD=permute(T_LD,(1,),(2,3,4,));
+#     @tensor T_LD[:]:= T_LD[-1,1,-2,-3]*S1[-4,1,-5];#M,R,D,d,virtual
+#     U1=@ignore_derivatives unitary(fuse(space(T_LD,2)⊗space(T_LD,5)), space(T_LD,2)⊗space(T_LD,5)); 
+#     @tensor T_LD[:]:=T_LD[-1,1,-3,-4,2]*U1[-2,1,2];#M,R',D,d
+#     T_LD=permute(T_LD,(1,4,2,3,));#M,d,R',D
 
-    B_LD_double, _ = build_double_layer_swap_Tm(B_LD0',B_LD, false);#L M U
-    T_LD_double, _ = build_double_layer_swap_Bm(T_LD0',T_LD, true);#D R M
+#     B_LD=permute(B_LD,(1,2,),(3,));
+#     T_LD=permute(T_LD,(1,),(2,3,4,));
 
-    ###################
+#     B_LD_double= build_double_layer_swap_Tm(B_LD0.conj(),B_LD, False);#L M U
+#     T_LD_double= build_double_layer_swap_Bm(T_LD0.conj(),T_LD, True);#D R M
 
-    B_RU=B_set[pos_RU[1],pos_RU[2]];#(LU,M)
-    T_RU=T_set[pos_RU[1],pos_RU[2]];#(M,dRD)
-    B_RU0=deepcopy(B_RU);
-    T_RU0=deepcopy(T_RU);
+#     ###################
 
-    @tensor T_RU[:]:= T_RU[-1,1,-2,-3]*S3[-5,-4,1];#M,R,D,d,virtual
-    U2=@ignore_derivatives unitary(fuse(space(T_RU,3)⊗space(T_RU,5)), space(T_RU,3)⊗space(T_RU,5)); 
-    @tensor T_RU[:]:=T_RU[-1,-2,1,-4,2]*U2[-3,1,2];#M,R,D',d
-    T_RU=permute(T_RU,(1,4,2,3,));#M,d,R,D
+#     B_RU=B_set[str(pos_RU[1-1])+','+str(pos_RU[2-1])];#(LU,M)
+#     T_RU=T_set[str(pos_RU[1-1])+','+str(pos_RU[2-1])];#(M,dRD)
+#     B_RU0=B_RU.clone();
+#     T_RU0=T_RU.clone();
 
-    B_RU=permute(B_RU,(1,2,),(3,));
-    T_RU=permute(T_RU,(1,),(2,3,4,));
+#     @tensor T_RU[:]:= T_RU[-1,1,-2,-3]*S3[-5,-4,1];#M,R,D,d,virtual
+#     U2=@ignore_derivatives unitary(fuse(space(T_RU,3)⊗space(T_RU,5)), space(T_RU,3)⊗space(T_RU,5)); 
+#     @tensor T_RU[:]:=T_RU[-1,-2,1,-4,2]*U2[-3,1,2];#M,R,D',d
+#     T_RU=permute(T_RU,(1,4,2,3,));#M,d,R,D
 
-    B_RU_double, _ = build_double_layer_swap_Tm(B_RU0',B_RU, false);#L M U
-    T_RU_double, _ = build_double_layer_swap_Bm(T_RU0',T_RU, true);#D R M
-    ########################
+#     B_RU=permute(B_RU,(1,2,),(3,));
+#     T_RU=permute(T_RU,(1,),(2,3,4,));
 
-    B_RD=B_set[pos_RD[1],pos_RD[2]];#(LU,M)
-    T_RD=T_set[pos_RD[1],pos_RD[2]];#(M,dRD)
-    B_RD0=deepcopy(B_RD);
-    T_RD0=deepcopy(T_RD);
+#     B_RU_double= build_double_layer_swap_Tm(B_RU0.conj(),B_RU, False);#L M U
+#     T_RU_double= build_double_layer_swap_Bm(T_RU0.conj(),T_RU, True);#D R M
+#     ########################
 
-    U_S2=@ignore_derivatives unitary(fuse(space(S2,2)*space(S2,3)), space(S2,2)*space(S2,3));
-    @tensor S2_[:]:=S2[-1,1,2,-3]*U_S2[-2,1,2];
-    U3=unitary(fuse(space(B_RD,3)*space(S2_,2)),space(B_RD,3)*space(S2_,2));
-    @tensor T_RD[:]:=T_RD[3,1,-3,-4]*U_S2'[-2,1,2]*U3'[3,2,-1];
-    @tensor B_RD[:]:=B_RD[1,3,5]*S2_[2,6,4]*U1'[1,2,-1]*U2'[3,4,-2]*U3[-3,5,6];#L,U,M
+#     B_RD=B_set[str(pos_RD[1-1])+','+str(pos_RD[2-1])];#(LU,M)
+#     T_RD=T_set[str(pos_RD[1-1])+','+str(pos_RD[2-1])];#(M,dRD)
+#     B_RD0=B_RD.clone();
+#     T_RD0=T_RD.clone();
+
+#     U_S2=@ignore_derivatives unitary(fuse(space(S2,2)*space(S2,3)), space(S2,2)*space(S2,3));
+#     @tensor S2_[:]:=S2[-1,1,2,-3]*U_S2[-2,1,2];
+#     U3=unitary(fuse(space(B_RD,3)*space(S2_,2)),space(B_RD,3)*space(S2_,2));
+#     @tensor T_RD[:]:=T_RD[3,1,-3,-4]*U_S2'[-2,1,2]*U3'[3,2,-1];
+#     @tensor B_RD[:]:=B_RD[1,3,5]*S2_[2,6,4]*U1'[1,2,-1]*U2'[3,4,-2]*U3[-3,5,6];#L,U,M
 
 
-    B_RD=permute(B_RD,(1,2,),(3,));
-    T_RD=permute(T_RD,(1,),(2,3,4,));
+#     B_RD=permute(B_RD,(1,2,),(3,));
+#     T_RD=permute(T_RD,(1,),(2,3,4,));
 
-    B_RD_double, _ = build_double_layer_swap_Tm(B_RD0',B_RD, false);#L M U
-    T_RD_double, _ = build_double_layer_swap_Bm(T_RD0',T_RD, true);#D R M
-    ######################
-    @tensor AA_LD[:]:=B_LD_double[-1,1,-4]*T_LD_double[-2,-3,1];
-    @tensor AA_RU[:]:=B_RU_double[-1,1,-4]*T_RU_double[-2,-3,1];
-    @tensor AA_RD[:]:=B_RD_double[-1,1,-4]*T_RD_double[-2,-3,1];
-    # return AA_LD,AA_RU,AA_RD
-    ################################################
+#     B_RD_double= build_double_layer_swap_Tm(B_RD0.conj(),B_RD, False);#L M U
+#     T_RD_double= build_double_layer_swap_Bm(T_RD0.conj(),T_RD, True);#D R M
+#     ######################
+#     @tensor AA_LD[:]:=B_LD_double[-1,1,-4]*T_LD_double[-2,-3,1];
+#     @tensor AA_RU[:]:=B_RU_double[-1,1,-4]*T_RU_double[-2,-3,1];
+#     @tensor AA_RD[:]:=B_RD_double[-1,1,-4]*T_RD_double[-2,-3,1];
+#     # return AA_LD,AA_RU,AA_RD
+#     ################################################
 
-    AA_LU0=get_AA_simple(double_B_set,double_T_set,pos_LU);
-    AA_LD0=get_AA_simple(double_B_set,double_T_set,pos_LD);
-    AA_RU0=get_AA_simple(double_B_set,double_T_set,pos_RU);
-    AA_RD0=get_AA_simple(double_B_set,double_T_set,pos_RD);
+#     AA_LU0=get_AA_simple(double_B_set,double_T_set,pos_LU);
+#     AA_LD0=get_AA_simple(double_B_set,double_T_set,pos_LD);
+#     AA_RU0=get_AA_simple(double_B_set,double_T_set,pos_RU);
+#     AA_RD0=get_AA_simple(double_B_set,double_T_set,pos_RD);
 
-    ob=ob_2x2_iPESS(CTM,AA_LU0,AA_RU,AA_LD,AA_RD,cx,cy);
-    Norm=ob_2x2_iPESS(CTM,AA_LU0,AA_RU0,AA_LD0,AA_RD0,cx,cy);
-    ob=ob/Norm;
+#     ob=ob_2x2_iPESS(CTM,AA_LU0,AA_RU,AA_LD,AA_RD,cx,cy,Lx,Ly).to_number();
+#     Norm=ob_2x2_iPESS(CTM,AA_LU0,AA_RU0,AA_LD0,AA_RD0,cx,cy,Lx,Ly).to_number();
+#     ob=ob/Norm;
 
-    return ob        
-end
+#     return ob        
 
 
 
-function hopping_x_iPESS_no_sign(CTM,O1,O2,B_set,T_set, double_B_set, double_T_set,cx,cy,ctm_setting)
-    global Lx,Ly
-    pos_LU=[mod1(cx+1,Lx),mod1(cy+1,Ly)];
-    pos_RU=[mod1(cx+2,Lx),mod1(cy+1,Ly)];
-    pos_LD=[mod1(cx+1,Lx),mod1(cy+2,Ly)];
-    pos_RD=[mod1(cx+2,Lx),mod1(cy+2,Ly)];
 
-    #########################################
+# def hopping_x_iPESS_no_sign(CTM,O1,O2,string12, B_set,T_set, double_B_set, double_T_set,cx,cy,Lx,Ly):
 
+#     pos_LU=[mod1(cx+1,Lx),mod1(cy+1,Ly)];
+#     pos_RU=[mod1(cx+2,Lx),mod1(cy+1,Ly)];
+#     pos_LD=[mod1(cx+1,Lx),mod1(cy+2,Ly)];
+#     pos_RD=[mod1(cx+2,Lx),mod1(cy+2,Ly)];
 
-    B_LU=B_set[pos_LU[1],pos_LU[2]];#(LU,M)
-    T_LU=T_set[pos_LU[1],pos_LU[2]];#(M,dRD)
-    B_LU0=deepcopy(B_LU);
-    T_LU0=deepcopy(T_LU);
-
-    @tensor T_LU[:]:=T_LU[-1,1,-3,-4]*O1[-5,-2,1];#M,d,R,D,virtual
-    U=@ignore_derivatives unitary(fuse(space(T_LU,3)⊗space(T_LU,5)), space(T_LU,3)⊗space(T_LU,5)); 
-    @tensor T_LU[:]:=T_LU[-1,-2,1,-4,2]*U[-3,1,2];#M,d,R',D
-
-    B_LU=permute(B_LU,(1,2,),(3,));
-    T_LU=permute(T_LU,(1,),(2,3,4,));
-    B_LU_double, _ = build_double_layer_swap_Tm(B_LU0',B_LU, false);#L M U
-    T_LU_double, _ = build_double_layer_swap_Bm(T_LU0',T_LU, true);#D R M
-    ###########################################
+#     #########################################
 
 
-    B_RU=B_set[pos_RU[1],pos_RU[2]];#(LU,M)
-    T_RU=T_set[pos_RU[1],pos_RU[2]];#(M,dRD)
-    B_RU0=deepcopy(B_RU);
-    T_RU0=deepcopy(T_RU);
+#     B_LU=B_set[str(pos_LU[1-1])+','+str(pos_LU[2-1])];#(LU,M)
+#     T_LU=T_set[str(pos_LU[1-1])+','+str(pos_LU[2-1])];#(M,dRD)
+#     B_LU0=B_LU.clone();
+#     T_LU0=T_LU.clone();
 
-    @tensor T_RU[:]:= T_RU[-1,1,-3,-4]*O2[-5,-2,1];#M,d,R,D,virtual'
+#     @tensor T_LU[:]:=T_LU[-1,1,-3,-4]*O1[-5,-2,1];#M,d,R,D,virtual
+#     U=@ignore_derivatives unitary(fuse(space(T_LU,3)⊗space(T_LU,5)), space(T_LU,3)⊗space(T_LU,5)); 
+#     @tensor T_LU[:]:=T_LU[-1,-2,1,-4,2]*U[-3,1,2];#M,d,R',D
+
+#     B_LU=permute(B_LU,(1,2,),(3,));
+#     T_LU=permute(T_LU,(1,),(2,3,4,));
+#     B_LU_double= build_double_layer_swap_Tm(B_LU0.conj(),B_LU, False);#L M U
+#     T_LU_double= build_double_layer_swap_Bm(T_LU0.conj(),T_LU, True);#D R M
+#     ###########################################
+
+
+#     B_RU=B_set[str(pos_RU[1-1])+','+str(pos_RU[2-1])];#(LU,M)
+#     T_RU=T_set[str(pos_RU[1-1])+','+str(pos_RU[2-1])];#(M,dRD)
+#     B_RU0=B_RU.clone();
+#     T_RU0=T_RU.clone();
+
+#     @tensor T_RU[:]:= T_RU[-1,1,-3,-4]*O2[-5,-2,1];#M,d,R,D,virtual'
     
-    U2=@ignore_derivatives unitary(fuse(space(T_RU,1)⊗space(T_RU,5)), space(T_RU,1)⊗space(T_RU,5));
-    @tensor T_RU[:]:=T_RU[1,-2,-3,-4,2]*U2[-1,1,2];##M',d,R,D
+#     U2=@ignore_derivatives unitary(fuse(space(T_RU,1)⊗space(T_RU,5)), space(T_RU,1)⊗space(T_RU,5));
+#     @tensor T_RU[:]:=T_RU[1,-2,-3,-4,2]*U2[-1,1,2];##M',d,R,D
 
-    O_string=@ignore_derivatives unitary(space(O1,1)',space(O1,1)');
-    @tensor B_RU[:]:=B_RU[-1,-2,-3]*O_string[-4,-5];#(L,U,M), (virtual,virtual')=>(L,U,M, virtual,virtual')
-    @tensor B_RU[:]:=B_RU[1,-2,3,2,4]*U'[1,2,-1]*U2'[3,4,-3];#L,U,M
+#     O_string=@ignore_derivatives unitary(space(O1,1)',space(O1,1)');
+#     @tensor B_RU[:]:=B_RU[-1,-2,-3]*O_string[-4,-5];#(L,U,M), (virtual,virtual')=>(L,U,M, virtual,virtual')
+#     @tensor B_RU[:]:=B_RU[1,-2,3,2,4]*U'[1,2,-1]*U2'[3,4,-3];#L,U,M
 
 
-    B_RU=permute(B_RU,(1,2,),(3,));
-    T_RU=permute(T_RU,(1,),(2,3,4,));
-    B_RU_double, _ = build_double_layer_swap_Tm(B_RU0',B_RU, false);#L M U
-    T_RU_double, _ = build_double_layer_swap_Bm(T_RU0',T_RU, true);#D R M
-    ####################################
-    @tensor AA_LU[:]:=B_LU_double[-1,1,-4]*T_LU_double[-2,-3,1];
-    @tensor AA_RU[:]:=B_RU_double[-1,1,-4]*T_RU_double[-2,-3,1];
-    # return AA_LU,AA_RU
+#     B_RU=permute(B_RU,(1,2,),(3,));
+#     T_RU=permute(T_RU,(1,),(2,3,4,));
+#     B_RU_double= build_double_layer_swap_Tm(B_RU0.conj(),B_RU, False);#L M U
+#     T_RU_double= build_double_layer_swap_Bm(T_RU0.conj(),T_RU, True);#D R M
+#     ####################################
+#     @tensor AA_LU[:]:=B_LU_double[-1,1,-4]*T_LU_double[-2,-3,1];
+#     @tensor AA_RU[:]:=B_RU_double[-1,1,-4]*T_RU_double[-2,-3,1];
+#     # return AA_LU,AA_RU
       
 
-    AA_LU0=get_AA_simple(double_B_set,double_T_set,pos_LU);
-    AA_LD0=get_AA_simple(double_B_set,double_T_set,pos_LD);
-    AA_RU0=get_AA_simple(double_B_set,double_T_set,pos_RU);
-    AA_RD0=get_AA_simple(double_B_set,double_T_set,pos_RD);
+#     AA_LU0=get_AA_simple(double_B_set,double_T_set,pos_LU);
+#     AA_LD0=get_AA_simple(double_B_set,double_T_set,pos_LD);
+#     AA_RU0=get_AA_simple(double_B_set,double_T_set,pos_RU);
+#     AA_RD0=get_AA_simple(double_B_set,double_T_set,pos_RD);
 
-    ob=ob_2x2_iPESS(CTM,AA_LU,AA_RU,AA_LD0,AA_RD0,cx,cy);
-    Norm=ob_2x2_iPESS(CTM,AA_LU0,AA_RU0,AA_LD0,AA_RD0,cx,cy);
-    ob=ob/Norm;
-    return ob
-end
+#     ob=ob_2x2_iPESS(CTM,AA_LU,AA_RU,AA_LD0,AA_RD0,cx,cy,Lx,Ly).to_number();
+#     Norm=ob_2x2_iPESS(CTM,AA_LU0,AA_RU0,AA_LD0,AA_RD0,cx,cy,Lx,Ly).to_number();
+#     ob=ob/Norm;
+#     return ob
 
-function hopping_y_iPESS_no_sign(CTM,O1,O2,B_set,T_set, double_B_set, double_T_set,cx,cy,ctm_setting)
-    global Lx,Ly
-    pos_LU=[mod1(cx+1,Lx),mod1(cy+1,Ly)];
-    pos_RU=[mod1(cx+2,Lx),mod1(cy+1,Ly)];
-    pos_LD=[mod1(cx+1,Lx),mod1(cy+2,Ly)];
-    pos_RD=[mod1(cx+2,Lx),mod1(cy+2,Ly)];
 
-    #############################################
+# def hopping_y_iPESS_no_sign(CTM,O1,O2,string12, B_set,T_set, double_B_set, double_T_set,cx,cy,Lx,Ly):
 
-    ####
-    B_RU=B_set[pos_RU[1],pos_RU[2]];#(LU,M)
-    T_RU=T_set[pos_RU[1],pos_RU[2]];#(M,dRD)
-    B_RU0=deepcopy(B_RU);
-    T_RU0=deepcopy(T_RU);
+#     pos_LU=[mod1(cx+1,Lx),mod1(cy+1,Ly)];
+#     pos_RU=[mod1(cx+2,Lx),mod1(cy+1,Ly)];
+#     pos_LD=[mod1(cx+1,Lx),mod1(cy+2,Ly)];
+#     pos_RD=[mod1(cx+2,Lx),mod1(cy+2,Ly)];
 
-    @tensor T_RU[:]:= T_RU[-1,1,-3,-4]*O1[-5,-2,1];#M,d,R,D,virtual
-    U1=@ignore_derivatives unitary(fuse(space(T_RU,4)⊗space(T_RU,5)), space(T_RU,4)⊗space(T_RU,5)); 
-    @tensor T_RU[:]:=T_RU[-1,-2,-3,1,2]*U1[-4,1,2];#M,d,R,D'
+#     #############################################
 
-    B_RU=permute(B_RU,(1,2,),(3,));
-    T_RU=permute(T_RU,(1,),(2,3,4,));
-    B_RU_double, _ = build_double_layer_swap_Tm(B_RU0',B_RU, false);#L M U
-    T_RU_double, _ = build_double_layer_swap_Bm(T_RU0',T_RU, true);#D R M
-    ####################################
+#     ####
+#     B_RU=B_set[str(pos_RU[1-1])+','+str(pos_RU[2-1])];#(LU,M)
+#     T_RU=T_set[str(pos_RU[1-1])+','+str(pos_RU[2-1])];#(M,dRD)
+#     B_RU0=B_RU.clone();
+#     T_RU0=T_RU.clone();
 
-    ####
-    B_RD=B_set[pos_RD[1],pos_RD[2]];#(LU,M)
-    T_RD=T_set[pos_RD[1],pos_RD[2]];#(M,dRD)
-    B_RD0=deepcopy(B_RD);
-    T_RD0=deepcopy(T_RD);
+#     @tensor T_RU[:]:= T_RU[-1,1,-3,-4]*O1[-5,-2,1];#M,d,R,D,virtual
+#     U1=@ignore_derivatives unitary(fuse(space(T_RU,4)⊗space(T_RU,5)), space(T_RU,4)⊗space(T_RU,5)); 
+#     @tensor T_RU[:]:=T_RU[-1,-2,-3,1,2]*U1[-4,1,2];#M,d,R,D'
+
+#     B_RU=permute(B_RU,(1,2,),(3,));
+#     T_RU=permute(T_RU,(1,),(2,3,4,));
+#     B_RU_double= build_double_layer_swap_Tm(B_RU0.conj(),B_RU, False);#L M U
+#     T_RU_double= build_double_layer_swap_Bm(T_RU0.conj(),T_RU, True);#D R M
+#     ####################################
+
+#     ####
+#     B_RD=B_set[str(pos_RD[1-1])+','+str(pos_RD[2-1])];#(LU,M)
+#     T_RD=T_set[str(pos_RD[1-1])+','+str(pos_RD[2-1])];#(M,dRD)
+#     B_RD0=B_RD.clone();
+#     T_RD0=T_RD.clone();
 
     
-    @tensor T_RD[:]:= T_RD[-1,1,-3,-4]*O2[-5,-2,1];#M,d,R,D,virtual
-    U2=@ignore_derivatives unitary(fuse(space(T_RD,1)⊗space(T_RD,5)), space(T_RD,1)⊗space(T_RD,5));
-    @tensor T_RD[:]:=T_RD[1,-2,-3,-4,2]*U2[-1,1,2];#M',d,R,D
+#     @tensor T_RD[:]:= T_RD[-1,1,-3,-4]*O2[-5,-2,1];#M,d,R,D,virtual
+#     U2=@ignore_derivatives unitary(fuse(space(T_RD,1)⊗space(T_RD,5)), space(T_RD,1)⊗space(T_RD,5));
+#     @tensor T_RD[:]:=T_RD[1,-2,-3,-4,2]*U2[-1,1,2];#M',d,R,D
 
-    O_string=@ignore_derivatives unitary(space(O1,1)',space(O1,1)');
-    @tensor B_RD[:]:= B_RD[-1,-2,-3]*O_string[-4,-5];#(L,U,M), (virtual',virtual)=>(L,U,M, virtual',virtual)
-    @tensor B_RD[:]:=B_RD[-1,1,3,2,4]*U1'[1,2,-2]*U2'[3,4,-3];#L,U,M
+#     O_string=@ignore_derivatives unitary(space(O1,1)',space(O1,1)');
+#     @tensor B_RD[:]:= B_RD[-1,-2,-3]*O_string[-4,-5];#(L,U,M), (virtual',virtual)=>(L,U,M, virtual',virtual)
+#     @tensor B_RD[:]:=B_RD[-1,1,3,2,4]*U1'[1,2,-2]*U2'[3,4,-3];#L,U,M
 
-    B_RD=permute(B_RD,(1,2,),(3,));
-    T_RD=permute(T_RD,(1,),(2,3,4,));
+#     B_RD=permute(B_RD,(1,2,),(3,));
+#     T_RD=permute(T_RD,(1,),(2,3,4,));
 
-    B_RD_double, _ = build_double_layer_swap_Tm(B_RD0',B_RD, false);#L M U
-    T_RD_double, _ = build_double_layer_swap_Bm(T_RD0',T_RD, true);#D R M
-    ###################################################
-    @tensor AA_RU[:]:=B_RU_double[-1,1,-4]*T_RU_double[-2,-3,1];
-    @tensor AA_RD[:]:=B_RD_double[-1,1,-4]*T_RD_double[-2,-3,1];
-    # return AA_RU,AA_RD
+#     B_RD_double= build_double_layer_swap_Tm(B_RD0.conj(),B_RD, False);#L M U
+#     T_RD_double= build_double_layer_swap_Bm(T_RD0.conj(),T_RD, True);#D R M
+#     ###################################################
+#     @tensor AA_RU[:]:=B_RU_double[-1,1,-4]*T_RU_double[-2,-3,1];
+#     @tensor AA_RD[:]:=B_RD_double[-1,1,-4]*T_RD_double[-2,-3,1];
+#     # return AA_RU,AA_RD
 
 
-    AA_LU0=get_AA_simple(double_B_set,double_T_set,pos_LU);
-    AA_LD0=get_AA_simple(double_B_set,double_T_set,pos_LD);
-    AA_RU0=get_AA_simple(double_B_set,double_T_set,pos_RU);
-    AA_RD0=get_AA_simple(double_B_set,double_T_set,pos_RD);
+#     AA_LU0=get_AA_simple(double_B_set,double_T_set,pos_LU);
+#     AA_LD0=get_AA_simple(double_B_set,double_T_set,pos_LD);
+#     AA_RU0=get_AA_simple(double_B_set,double_T_set,pos_RU);
+#     AA_RD0=get_AA_simple(double_B_set,double_T_set,pos_RD);
     
-    ob=ob_2x2_iPESS(CTM,AA_LU0,AA_RU,AA_LD0,AA_RD,cx,cy);
-    Norm=ob_2x2_iPESS(CTM,AA_LU0,AA_RU0,AA_LD0,AA_RD0,cx,cy);
-    ob=ob/Norm;
-    return ob
-end
-
-function hopping_diagonala_iPESS_no_sign(CTM,O1,O2,B_set,T_set, double_B_set, double_T_set, cx,cy,ctm_setting)
-    global Lx,Ly
-    pos_LU=[mod1(cx+1,Lx),mod1(cy+1,Ly)];
-    pos_RU=[mod1(cx+2,Lx),mod1(cy+1,Ly)];
-    pos_LD=[mod1(cx+1,Lx),mod1(cy+2,Ly)];
-    pos_RD=[mod1(cx+2,Lx),mod1(cy+2,Ly)];
-
-    ###################################################
+#     ob=ob_2x2_iPESS(CTM,AA_LU0,AA_RU,AA_LD0,AA_RD,cx,cy,Lx,Ly).to_number();
+#     Norm=ob_2x2_iPESS(CTM,AA_LU0,AA_RU0,AA_LD0,AA_RD0,cx,cy,Lx,Ly).to_number();
+#     ob=ob/Norm;
+#     return ob
 
 
-    ######
-    B_LD=B_set[pos_LD[1],pos_LD[2]];#(LU,M)
-    T_LD=T_set[pos_LD[1],pos_LD[2]];#(M,dRD)
-    B_LD0=deepcopy(B_LD);
-    T_LD0=deepcopy(T_LD);
+# def hopping_diagonala_iPESS_no_sign(CTM,O1,O2,string12, B_set,T_set, double_B_set, double_T_set, cx,cy,Lx,Ly):
 
-    @tensor T_LD[:]:= T_LD[-1,1,-2,-3]*O1[-5,-4,1];#M,R,D,d,virtual
-    U1=@ignore_derivatives unitary(fuse(space(T_LD,2)⊗space(T_LD,5)), space(T_LD,2)⊗space(T_LD,5)); 
-    @tensor T_LD[:]:=T_LD[-1,1,-3,-4,2]*U1[-2,1,2];#M,R',D,d
-    T_LD=permute(T_LD,(1,4,2,3,));#M,d,R',D
+#     pos_LU=[mod1(cx+1,Lx),mod1(cy+1,Ly)];
+#     pos_RU=[mod1(cx+2,Lx),mod1(cy+1,Ly)];
+#     pos_LD=[mod1(cx+1,Lx),mod1(cy+2,Ly)];
+#     pos_RD=[mod1(cx+2,Lx),mod1(cy+2,Ly)];
 
-    B_LD=permute(B_LD,(1,2,),(3,));
-    T_LD=permute(T_LD,(1,),(2,3,4,));
-
-    B_LD_double, _ = build_double_layer_swap_Tm(B_LD0',B_LD, false);#L M U
-    T_LD_double, _ = build_double_layer_swap_Bm(T_LD0',T_LD, true);#D R M
-
-    #############################################
-
-    ######
-    B_RU=B_set[pos_RU[1],pos_RU[2]];#(LU,M)
-    T_RU=T_set[pos_RU[1],pos_RU[2]];#(M,dRD)
-    B_RU0=deepcopy(B_RU);
-    T_RU0=deepcopy(T_RU);
-
-    @tensor T_RU[:]:= T_RU[-1,1,-2,-3]*O2[-5,-4,1];#M,R,D,d,virtual
-    U2=@ignore_derivatives unitary(fuse(space(T_RU,3)⊗space(T_RU,5)), space(T_RU,3)⊗space(T_RU,5)); 
-    @tensor T_RU[:]:=T_RU[-1,-2,1,-4,2]*U2[-3,1,2];#M,R,D',d
-    T_RU=permute(T_RU,(1,4,2,3,));#M,d,R,D
-
-    B_RU=permute(B_RU,(1,2,),(3,));
-    T_RU=permute(T_RU,(1,),(2,3,4,));
-
-    B_RU_double, _ = build_double_layer_swap_Tm(B_RU0',B_RU, false);#L M U
-    T_RU_double, _ = build_double_layer_swap_Bm(T_RU0',T_RU, true);#D R M
-    ################################################
-
-    ######
-    B_RD=B_set[pos_RD[1],pos_RD[2]];#(LU,M)
-    T_RD=T_set[pos_RD[1],pos_RD[2]];#(M,dRD)
-    B_RD0=deepcopy(B_RD);
-    T_RD0=deepcopy(T_RD);
-
-    O_string=@ignore_derivatives unitary(space(O1,1),space(O1,1));
-    @tensor B_RD[:]:=B_RD[1,3,-3]*O_string[4,2]*U1'[1,2,-1]*U2'[3,4,-2];#L,U,M
+#     ###################################################
 
 
-    B_RD=permute(B_RD,(1,2,),(3,));
-    T_RD=permute(T_RD,(1,),(2,3,4,));
+#     ######
+#     B_LD=B_set[str(pos_LD[1-1])+','+str(pos_LD[2-1])];#(LU,M)
+#     T_LD=T_set[str(pos_LD[1-1])+','+str(pos_LD[2-1])];#(M,dRD)
+#     B_LD0=B_LD.clone();
+#     T_LD0=T_LD.clone();
 
-    B_RD_double, _ = build_double_layer_swap_Tm(B_RD0',B_RD, false);#L M U
-    T_RD_double, _ = build_double_layer_swap_Bm(T_RD0',T_RD, true);#D R M
-    ################################################
-    @tensor AA_LD[:]:=B_LD_double[-1,1,-4]*T_LD_double[-2,-3,1];
-    @tensor AA_RU[:]:=B_RU_double[-1,1,-4]*T_RU_double[-2,-3,1];
-    @tensor AA_RD[:]:=B_RD_double[-1,1,-4]*T_RD_double[-2,-3,1];
-    # return AA_LD,AA_RU,AA_RD
-    ################################################
+#     @tensor T_LD[:]:= T_LD[-1,1,-2,-3]*O1[-5,-4,1];#M,R,D,d,virtual
+#     U1=@ignore_derivatives unitary(fuse(space(T_LD,2)⊗space(T_LD,5)), space(T_LD,2)⊗space(T_LD,5)); 
+#     @tensor T_LD[:]:=T_LD[-1,1,-3,-4,2]*U1[-2,1,2];#M,R',D,d
+#     T_LD=permute(T_LD,(1,4,2,3,));#M,d,R',D
 
-    AA_LU0=get_AA_simple(double_B_set,double_T_set,pos_LU);
-    AA_LD0=get_AA_simple(double_B_set,double_T_set,pos_LD);
-    AA_RU0=get_AA_simple(double_B_set,double_T_set,pos_RU);
-    AA_RD0=get_AA_simple(double_B_set,double_T_set,pos_RD);
+#     B_LD=permute(B_LD,(1,2,),(3,));
+#     T_LD=permute(T_LD,(1,),(2,3,4,));
 
-    ob=ob_2x2_iPESS(CTM,AA_LU0,AA_RU,AA_LD,AA_RD,cx,cy);
-    Norm=ob_2x2_iPESS(CTM,AA_LU0,AA_RU0,AA_LD0,AA_RD0,cx,cy);
-    ob=ob/Norm;
-    return ob        
-end
+#     B_LD_double= build_double_layer_swap_Tm(B_LD0.conj(),B_LD, False);#L M U
+#     T_LD_double= build_double_layer_swap_Bm(T_LD0.conj(),T_LD, True);#D R M
+
+#     #############################################
+
+#     ######
+#     B_RU=B_set[str(pos_RU[1-1])+','+str(pos_RU[2-1])];#(LU,M)
+#     T_RU=T_set[str(pos_RU[1-1])+','+str(pos_RU[2-1])];#(M,dRD)
+#     B_RU0=B_RU.clone();
+#     T_RU0=T_RU.clone();
+
+#     @tensor T_RU[:]:= T_RU[-1,1,-2,-3]*O2[-5,-4,1];#M,R,D,d,virtual
+#     U2=@ignore_derivatives unitary(fuse(space(T_RU,3)⊗space(T_RU,5)), space(T_RU,3)⊗space(T_RU,5)); 
+#     @tensor T_RU[:]:=T_RU[-1,-2,1,-4,2]*U2[-3,1,2];#M,R,D',d
+#     T_RU=permute(T_RU,(1,4,2,3,));#M,d,R,D
+
+#     B_RU=permute(B_RU,(1,2,),(3,));
+#     T_RU=permute(T_RU,(1,),(2,3,4,));
+
+#     B_RU_double= build_double_layer_swap_Tm(B_RU0.conj(),B_RU, False);#L M U
+#     T_RU_double= build_double_layer_swap_Bm(T_RU0.conj(),T_RU, True);#D R M
+#     ################################################
+
+#     ######
+#     B_RD=B_set[str(pos_RD[1-1])+','+str(pos_RD[2-1])];#(LU,M)
+#     T_RD=T_set[str(pos_RD[1-1])+','+str(pos_RD[2-1])];#(M,dRD)
+#     B_RD0=B_RD.clone();
+#     T_RD0=T_RD.clone();
+
+#     O_string=@ignore_derivatives unitary(space(O1,1),space(O1,1));
+#     @tensor B_RD[:]:=B_RD[1,3,-3]*O_string[4,2]*U1'[1,2,-1]*U2'[3,4,-2];#L,U,M
 
 
-#########################################
+#     B_RD=permute(B_RD,(1,2,),(3,));
+#     T_RD=permute(T_RD,(1,),(2,3,4,));
+
+#     B_RD_double= build_double_layer_swap_Tm(B_RD0.conj(),B_RD, False);#L M U
+#     T_RD_double= build_double_layer_swap_Bm(T_RD0.conj(),T_RD, True);#D R M
+#     ################################################
+#     @tensor AA_LD[:]:=B_LD_double[-1,1,-4]*T_LD_double[-2,-3,1];
+#     @tensor AA_RU[:]:=B_RU_double[-1,1,-4]*T_RU_double[-2,-3,1];
+#     @tensor AA_RD[:]:=B_RD_double[-1,1,-4]*T_RD_double[-2,-3,1];
+#     # return AA_LD,AA_RU,AA_RD
+#     ################################################
+
+#     AA_LU0=get_AA_simple(double_B_set,double_T_set,pos_LU);
+#     AA_LD0=get_AA_simple(double_B_set,double_T_set,pos_LD);
+#     AA_RU0=get_AA_simple(double_B_set,double_T_set,pos_RU);
+#     AA_RD0=get_AA_simple(double_B_set,double_T_set,pos_RD);
+
+#     ob=ob_2x2_iPESS(CTM,AA_LU0,AA_RU,AA_LD,AA_RD,cx,cy,Lx,Ly).to_number();
+#     Norm=ob_2x2_iPESS(CTM,AA_LU0,AA_RU0,AA_LD0,AA_RD0,cx,cy,Lx,Ly).to_number();
+#     ob=ob/Norm;
+#     return ob        
 
 
 
-function evaluate_ob_cell_iPESS(parameters, B_set,T_set, double_B_set, double_T_set, CTM_cell, ctm_setting, energy_setting)
+# #########################################
+
+
+
+def evaluate_ob_cell_iPESS(parameters, B_set,T_set, double_B_set, double_T_set, CTM_cell, energy_setting, config_kwargs, global_args):
     """change of coordinate 
     (1,1)  (2,1)
     (1,2)  (2,2)
 
     coordinate of C1 tensor: (cx,cy)
-    """    
+    """      
+    Lx=global_args.Lx
+    Ly=global_args.Ly
+    with torch.no_grad(): 
+        Ident, N_occu, n_double, Cdag, C, CdagC_string =Hamiltonians_spinful_Z2(config_kwargs);
 
-    global Lx,Ly
-
-    if isa(space(B_set[1,1],1),GradedSpace{Z2Irrep, Tuple{Int64, Int64}})
-        
-        if energy_setting.model in  ("Triangle_Hofstadter_Hubbard", "spinful_triangle_lattice", "standard_triangle_Hubbard")
-            Hamiltonian_terms=Hamiltonians_spinful_Z2;
-        elseif (energy_setting.model == "Triangle_Hofstadter_spinless")
-            Hamiltonian_terms=Hamiltonians_spinless_Z2;
-        end
-    elseif isa(space(B_set[1,1],1),GradedSpace{U1Irrep, TensorKit.SortedVectorDict{U1Irrep, Int64}})
-        Hamiltonian_terms=Hamiltonians_spinless_U1;
-    elseif isa(space(B_set[1,1],1),GradedSpace{SU2Irrep, TensorKit.SortedVectorDict{SU2Irrep, Int64}})
-        Hamiltonian_terms=Hamiltonians_spinful_SU2;
-    elseif isa(space(B_set[1,1],1),GradedSpace{ProductSector{Tuple{U1Irrep, SU2Irrep}}, TensorKit.SortedVectorDict{ProductSector{Tuple{U1Irrep, SU2Irrep}}, Int64}})
-        if mod(energy_setting.Magnetic_cell,2)==1 #odd number of sites in unitcell
-            @assert mod(Ly,2)==0;
-            #if use U1 symmetry, use different dummy physical space along y direction along Ly, where Ly should be even number
-        end
-        Hamiltonian_terms=Hamiltonians_spinful_U1_SU2;
-    end
-
-
-    if energy_setting.model=="spinful_triangle_lattice"
+    if energy_setting.model=="spinful_triangle_lattice":
     
-        @assert mod(Lx,2)==0
-        #for 120 degree magnetic order in the Hofstadter M2 model. Unit-cell for 120 degree order should be at least 3x3.  
-        Ident_set, N_occu_set, n_double_set, Cdag_set, C_set =@ignore_derivatives Hamiltonian_terms();
-        t1=parameters["t1"];
-        t2=parameters["t2"];
-        ϕ=parameters["ϕ"];
-        μ=parameters["μ"];
-        U=parameters["U"];
+        assert mod(Lx,2)==0
+        #for 120 degree magnetic order in the Hofstadter M2 model. Unit-cell for 120 degree order should be at least 3x3. 
 
-        ex_set=zeros(Lx,Ly)*im;
-        ey_set=zeros(Lx,Ly)*im;
-        e_diagonala_set=zeros(Lx,Ly)*im;
-        e0_set=zeros(Lx,Ly)*im;
-        eU_set=zeros(Lx,Ly)*im;
+        t1=parameters['t1'];
+        t2=parameters['t2'];
+        ϕ=parameters['ϕ'];
+        μ=parameters['μ'];
+        U=parameters['U'];
+
+        with torch.no_grad():
+            ex_set=torch.zeros(Lx,Ly)*1j;
+            ey_set=torch.zeros(Lx,Ly)*1j;
+            e_diagonala_set=torch.zeros(Lx,Ly)*1j;
+            e0_set=torch.zeros(Lx,Ly)*1j;
+            eU_set=torch.zeros(Lx,Ly)*1j;
 
         
         E_total=0;
 
-        for cx=1:Lx
-            for cy=1:Ly
+        for cx in range(1,Lx+1):
+            for cy in range(1,Ly+1):
 
-
-                # pos_LU=[mod1(cx+1,Lx),mod1(cy+1,Ly)];
-                # pos_RU=[mod1(cx+2,Lx),mod1(cy+1,Ly)];
-                # pos_LD=[mod1(cx+1,Lx),mod1(cy+2,Ly)];
-                # pos_RD=[mod1(cx+2,Lx),mod1(cy+2,Ly)];
-
-                # AA_LU0=get_AA_simple(double_B_set,double_T_set,pos_LU);
-                # AA_LD0=get_AA_simple(double_B_set,double_T_set,pos_LD);
-                # AA_RU0=get_AA_simple(double_B_set,double_T_set,pos_RU);
-                # AA_RD0=get_AA_simple(double_B_set,double_T_set,pos_RD);
-                
-
-
-                ex=hopping_x_iPESS(CTM_cell,Cdag_set[mod1(cx+1,2)],C_set[mod1(cx+2,2)],B_set,T_set, double_B_set, double_T_set,cx,cy,ctm_setting);
-                ey=hopping_y_iPESS(CTM_cell,Cdag_set[mod1(cx+2,2)],C_set[mod1(cx+2,2)],B_set,T_set, double_B_set, double_T_set,cx,cy,ctm_setting);
-                e_diagonala=hopping_diagonala_iPESS(CTM_cell,Cdag_set[mod1(cx+1,2)],C_set[mod1(cx+2,2)],B_set,T_set, double_B_set, double_T_set,cx,cy,ctm_setting);
-                e0=ob_onsite_iPESS(CTM_cell,N_occu_set[mod1(cx+1,2)],B_set,T_set, double_B_set, double_T_set,cx,cy,ctm_setting);
-                eU=ob_onsite_iPESS(CTM_cell,n_double_set[mod1(cx+1,2)]-(1/2)*N_occu_set[mod1(cx+1,2)]+(1/4)*Ident_set[mod1(cx+1,2)],B_set,T_set, double_B_set, double_T_set,cx,cy,ctm_setting);
-                @ignore_derivatives ex_set[cx,cy]=ex;
-                @ignore_derivatives ey_set[cx,cy]=ey;
-                @ignore_derivatives e_diagonala_set[cx,cy]=e_diagonala;
-                @ignore_derivatives e0_set[cx,cy]=e0;
-                @ignore_derivatives eU_set[cx,cy]=eU;
-                if mod(cx,2)==1
-                    E_total=E_total+real(t1*(exp(im*ϕ)*ex+exp(-im*ϕ)*ex')-t1*(ey+ey')-t2*(e_diagonala+e_diagonala') -μ*e0 +U*eU);
-                else
-                    E_total=E_total+real(t1*(exp(im*ϕ)*ex+exp(-im*ϕ)*ex')+t1*(ey+ey')+t2*(e_diagonala+e_diagonala') -μ*e0 +U*eU);
-                end
-            end
-        end
+                ex=hopping_x_iPESS(CTM_cell, Cdag, C, CdagC_string, B_set,T_set, double_B_set, double_T_set,cx,cy,Lx,Ly);
+                ey=hopping_y_iPESS(CTM_cell, Cdag, C, CdagC_string, B_set,T_set, double_B_set, double_T_set,cx,cy,Lx,Ly);
+                e_diagonala=hopping_diagonala_iPESS(CTM_cell, Cdag, C, CdagC_string, B_set,T_set, double_B_set, double_T_set,cx,cy,Lx,Ly);
+                e0=ob_onsite_iPESS(CTM_cell,N_occu, B_set,T_set, double_B_set, double_T_set,cx,cy,Lx,Ly);
+                eU=ob_onsite_iPESS(CTM_cell,n_double-(1/2)*N_occu+(1/4)*Ident,B_set,T_set, double_B_set, double_T_set,cx,cy,Lx,Ly);
+                with torch.no_grad():
+                    ex_set[cx-1,cy-1]=ex;
+                    ey_set[cx-1,cy-1]=ey;
+                    e_diagonala_set[cx-1,cy-1]=e_diagonala;
+                    e0_set[cx-1,cy-1]=e0;
+                    eU_set[cx-1,cy-1]=eU;
+                if mod(cx,2)==1:
+                    E_total=E_total+real(t1*(exp(1j*ϕ)*ex)*2-t1*(ey)*2-t2*(e_diagonala)*2 -μ*e0 +U*eU);
+                else:
+                    E_total=E_total+real(t1*(exp(1j*ϕ)*ex)*2+t1*(ey)*2+t2*(e_diagonala)*2 -μ*e0 +U*eU);
 
         E_total=E_total/(Lx*Ly);
         return E_total,  ex_set, ey_set, e_diagonala_set, e0_set, eU_set
     
 
-    elseif energy_setting.model in ("Triangle_Hofstadter_Hubbard","Triangle_Hofstadter_spinless")
-        @assert mod(Lx,energy_setting.Magnetic_cell)==0;
-        Ident_set, N_occu_set, n_double_set, Cdag_set, C_set =@ignore_derivatives Hamiltonian_terms();
 
-        parameters_site=@ignore_derivatives get_Hofstadter_coefficients(Lx,Ly,parameters,energy_setting);
-        tx_coe_set=parameters_site["tx_coe_set"];
-        ty_coe_set=parameters_site["ty_coe_set"];
-        t2_coe_set=parameters_site["t2_coe_set"];
-        U_coe_set=parameters_site["U_coe_set"];
-        μ_coe_set=parameters_site["μ_coe_set"];
+    elif energy_setting.model =="standard_triangle_Hubbard":
+        
+        t1=parameters['t1'];
+        t2=parameters['t2'];
+        μ=parameters['μ'];
+        U=parameters['U'];
 
-        ex_set=zeros(Lx,Ly)*im;
-        ey_set=zeros(Lx,Ly)*im;
-        e_diagonala_set=zeros(Lx,Ly)*im;
-        e0_set=zeros(Lx,Ly)*im;
-        eU_set=zeros(Lx,Ly)*im;
+        with torch.no_grad():
+            ex_set=torch.zeros(Lx,Ly)*1j;
+            ey_set=torch.zeros(Lx,Ly)*1j;
+            e_diagonala_set=torch.zeros(Lx,Ly)*1j;
+            e0_set=torch.zeros(Lx,Ly)*1j;
+            eU_set=torch.zeros(Lx,Ly)*1j;
         
         E_total=0;
-        for px=1:Lx
-            for py=1:Ly
+        for px in range(1,Lx+1):
+            for py in range(1,Ly+1):
                 #(cx,cy): coordinate of left-top C1 tensor
                 cx=mod1(px-1,Lx);
                 cy=mod1(py-1,Ly);
-                ex=hopping_x_iPESS(CTM_cell,Cdag_set[mod1(py,Ly)],C_set[mod1(py,Ly)],B_set,T_set, double_B_set, double_T_set,cx,cy,ctm_setting);
-                ey=hopping_y_iPESS(CTM_cell,Cdag_set[mod1(py,Ly)],C_set[mod1(py+1,Ly)],B_set,T_set, double_B_set, double_T_set,cx,cy,ctm_setting);
-                e_diagonala=hopping_diagonala_iPESS(CTM_cell,Cdag_set[mod1(py+1,Ly)],C_set[mod1(py,Ly)],B_set,T_set, double_B_set, double_T_set,cx,cy,ctm_setting);
-                e0=ob_onsite_iPESS(CTM_cell,N_occu_set[mod1(py,Ly)],B_set,T_set, double_B_set, double_T_set,cx,cy,ctm_setting);
-                eU=ob_onsite_iPESS(CTM_cell,n_double_set[mod1(py,Ly)]-(1/2)*N_occu_set[mod1(py,Ly)]+(1/4)*Ident_set[mod1(py,Ly)],B_set,T_set, double_B_set, double_T_set,cx,cy,ctm_setting);
-                @ignore_derivatives ex_set[px,py]=ex;
-                @ignore_derivatives ey_set[px,py]=ey;
-                @ignore_derivatives e_diagonala_set[px,py]=e_diagonala;
-                @ignore_derivatives e0_set[px,py]=e0;
-                @ignore_derivatives eU_set[px,py]=eU;
-                tx_coe=tx_coe_set[px,py];
-                ty_coe=ty_coe_set[px,py];
-                t2_coe=t2_coe_set[px,py];
-                U_coe=U_coe_set[px,py];
-                μ_coe=μ_coe_set[px,py];
-                E_temp=tx_coe*ex +ty_coe*ey +t2_coe*e_diagonala -μ_coe*e0/2  +U_coe*eU/2;
-                E_total=E_total+real(E_temp+E_temp');
-                
-            end
-        end 
-        E_total=E_total/(Lx*Ly);
-        return E_total,  ex_set, ey_set, e_diagonala_set, e0_set, eU_set
-    elseif energy_setting.model =="standard_triangle_Hubbard" 
-        Ident_set, N_occu_set, n_double_set, Cdag_set, C_set =@ignore_derivatives Hamiltonian_terms();
-        t1=parameters["t1"];
-        t2=parameters["t2"];
-        μ=parameters["μ"];
-        U=parameters["U"];
-
-        ex_set=zeros(Lx,Ly)*im;
-        ey_set=zeros(Lx,Ly)*im;
-        e_diagonala_set=zeros(Lx,Ly)*im;
-        e0_set=zeros(Lx,Ly)*im;
-        eU_set=zeros(Lx,Ly)*im;
-        
-        E_total=0;
-        for px=1:Lx
-            for py=1:Ly
-                #(cx,cy): coordinate of left-top C1 tensor
-                cx=mod1(px-1,Lx);
-                cy=mod1(py-1,Ly);
-                ex=hopping_x_iPESS(CTM_cell,Cdag_set[mod1(py,2)],C_set[mod1(py,2)],B_set,T_set, double_B_set, double_T_set,cx,cy,ctm_setting);
-                ey=hopping_y_iPESS(CTM_cell,Cdag_set[mod1(py,2)],C_set[mod1(py+1,2)],B_set,T_set, double_B_set, double_T_set,cx,cy,ctm_setting);
-                e_diagonala=hopping_diagonala_iPESS(CTM_cell,Cdag_set[mod1(py+1,2)],C_set[mod1(py,2)],B_set,T_set, double_B_set, double_T_set,cx,cy,ctm_setting);
-                e0=ob_onsite_iPESS(CTM_cell,N_occu_set[mod1(py,2)],B_set,T_set, double_B_set, double_T_set,cx,cy,ctm_setting);
-                eU=ob_onsite_iPESS(CTM_cell,n_double_set[mod1(py,2)]-(1/2)*N_occu_set[mod1(py,2)]+(1/4)*Ident_set[mod1(py,2)],B_set,T_set, double_B_set, double_T_set,cx,cy,ctm_setting);
-                @ignore_derivatives ex_set[px,py]=ex;
-                @ignore_derivatives ey_set[px,py]=ey;
-                @ignore_derivatives e_diagonala_set[px,py]=e_diagonala;
-                @ignore_derivatives e0_set[px,py]=e0;
-                @ignore_derivatives eU_set[px,py]=eU;
+                ex=hopping_x_iPESS(CTM_cell, Cdag, C, CdagC_string, B_set,T_set, double_B_set, double_T_set,cx,cy,Lx,Ly);
+                ey=hopping_y_iPESS(CTM_cell, Cdag, C, CdagC_string, B_set,T_set, double_B_set, double_T_set,cx,cy,Lx,Ly);
+                e_diagonala=hopping_diagonala_iPESS(CTM_cell, Cdag, C, CdagC_string, B_set,T_set, double_B_set, double_T_set,cx,cy,Lx,Ly);
+                e0=ob_onsite_iPESS(CTM_cell,N_occu, B_set,T_set, double_B_set, double_T_set,cx,cy,Lx,Ly);
+                eU=ob_onsite_iPESS(CTM_cell,n_double-(1/2)*N_occu+(1/4)*Ident, B_set,T_set, double_B_set, double_T_set,cx,cy,Lx,Ly);
+                with torch.no_grad():
+                    ex_set[px-1,py-1]=ex;
+                    ey_set[px-1,py-1]=ey;
+                    e_diagonala_set[px-1,py-1]=e_diagonala;
+                    e0_set[px-1,py-1]=e0;
+                    eU_set[px-1,py-1]=eU;
 
                 E_temp=-t1*ex -t1*ey -t2*e_diagonala -μ*e0/2  +U*eU/2;
                 #E_temp=-t1*ex -t1*ey -t2*e_diagonala  +U*eU/2; # do not include chemical potential
-                E_total=E_total+real(E_temp+E_temp');
+                E_total=E_total+real(E_temp)*2;
                 
-            end
-        end 
         E_total=E_total/(Lx*Ly);
         return E_total,  ex_set, ey_set, e_diagonala_set, e0_set, eU_set
-    end
-end
+    
 
 
 
 
-function evaluate_spin_cell_iPESS(B_set,T_set, double_B_set, double_T_set, CTM_cell, ctm_setting)
+
+def evaluate_spin_cell_iPESS(B_set,T_set, double_B_set, double_T_set, CTM_cell, config_kwargs, global_args):
     """change of coordinate 
     (1,1)  (2,1)
     (1,2)  (2,2)
 
     coordinate of C1 tensor: (cx,cy)
     """    
-    global Lx,Ly
-    if isa(space(B_set[1,1],1),GradedSpace{Z2Irrep, Tuple{Int64, Int64}})
-        sx_op,sy_op,sz_op=spin_operator_Z2();
-    else
-        println("Virtual symmetry is not Z2, no need to compute spin polarization.")
-    end
-    sx_set=zeros(Lx,Ly)*im;
-    sy_set=zeros(Lx,Ly)*im;
-    sz_set=zeros(Lx,Ly)*im;
-    for cx=1:Lx
-        for cy=1:Ly
-            #(cx,cy): coordinate of left-top C1 tensor
+    Lx=global_args.Lx;
+    Ly=global_args.Ly;
+    with torch.no_grad():
+        sx_op,sy_op,sz_op=spin_operator_Z2(config_kwargs);
 
-            # pos_LU=[mod1(cx+1,Lx),mod1(cy+1,Ly)];
-            # pos_RU=[mod1(cx+2,Lx),mod1(cy+1,Ly)];
-            # pos_LD=[mod1(cx+1,Lx),mod1(cy+2,Ly)];
-            # pos_RD=[mod1(cx+2,Lx),mod1(cy+2,Ly)];
+        sx_set=torch.zeros(Lx,Ly)*1j;
+        sy_set=torch.zeros(Lx,Ly)*1j;
+        sz_set=torch.zeros(Lx,Ly)*1j;
+        for cx in range(1,Lx+1):
+            for cy in range(1,Ly+1):
+                #(cx,cy): coordinate of left-top C1 tensor
 
-            # AA_LU0=get_AA_simple(double_B_set,double_T_set,pos_LU);
-            # AA_LD0=get_AA_simple(double_B_set,double_T_set,pos_LD);
-            # AA_RU0=get_AA_simple(double_B_set,double_T_set,pos_RU);
-            # AA_RD0=get_AA_simple(double_B_set,double_T_set,pos_RD);
+                sx0=ob_onsite_iPESS(CTM_cell,sx_op,B_set,T_set, double_B_set, double_T_set,cx,cy,Lx,Ly);
+                sy0=ob_onsite_iPESS(CTM_cell,sy_op,B_set,T_set, double_B_set, double_T_set,cx,cy,Lx,Ly);
+                sz0=ob_onsite_iPESS(CTM_cell,sz_op,B_set,T_set, double_B_set, double_T_set,cx,cy,Lx,Ly);
+                sx_set[cx-1,cy-1]=sx0;
+                sy_set[cx-1,cy-1]=sy0;
+                sz_set[cx-1,cy-1]=sz0;
 
-            sx0=ob_onsite_iPESS(CTM_cell,sx_op,B_set,T_set, double_B_set, double_T_set,cx,cy,ctm_setting);
-            sy0=ob_onsite_iPESS(CTM_cell,sy_op,B_set,T_set, double_B_set, double_T_set,cx,cy,ctm_setting);
-            sz0=ob_onsite_iPESS(CTM_cell,sz_op,B_set,T_set, double_B_set, double_T_set,cx,cy,ctm_setting);
-            @ignore_derivatives sx_set[cx,cy]=sx0;
-            @ignore_derivatives sy_set[cx,cy]=sy0;
-            @ignore_derivatives sz_set[cx,cy]=sz0;
-        end
-    end 
-    return sx_set,sy_set,sz_set
-end
+        return sx_set,sy_set,sz_set
 
 
 
 
 
-function evaluate_spin_ob_cell_iPESS(B_set,T_set, double_B_set, double_T_set, CTM_cell, ctm_setting, energy_setting)
+
+def evaluate_spin_ob_cell_iPESS(B_set,T_set, double_B_set, double_T_set, CTM_cell, energy_setting, config_kwargs, global_args):
     """change of coordinate 
     (1,1)  (2,1)
     (1,2)  (2,2)
 
     coordinate of C1 tensor: (cx,cy)
     """    
+    Lx=global_args.Lx
+    Ly=global_args.Ly
+    with torch.no_grad():
+        Sa, Sb, SS_string, chirality_S1, chirality_S2, chirality_S3, chirality_string12, chirality_string23 =Operators_spinful_Z2(config_kwargs);
+ 
+        triangle_up_set=torch.zeros(Lx,Ly)*1j;
+        triangle_dn_set=torch.zeros(Lx,Ly)*1j;
 
-    global Lx,Ly
-
-    if isa(space(B_set[1,1],1),GradedSpace{Z2Irrep, Tuple{Int64, Int64}}) 
-        Hamiltonian_terms=Operators_spinful_Z2;
-    elseif isa(space(B_set[1,1],1),GradedSpace{SU2Irrep, TensorKit.SortedVectorDict{SU2Irrep, Int64}})
-        Hamiltonian_terms=Operators_spinful_SU2;
-    end
-
-    (Ident,Ident,), (N_occu,N_occu,), (n_hole,n_hole), (n_double,n_double,), (Cdag,Cdag,), (C,C,), (CdagupCdagdn,CdagupCdagdn), (Pairinga,Pairinga), (Pairingb,Pairingb), (Sa,Sa), (Sb,Sb), chirality_S1,chirality_S2,chirality_S3 =@ignore_derivatives  Hamiltonian_terms();
-
-    if energy_setting.model in ("spinful_triangle_lattice","standard_triangle_Hubbard",)
-        #for 120 degree magnetic order in the Hofstadter M2 model. Unit-cell for 120 degree order should be at least 3x3.  
-        
-
-        triangle_up_set=zeros(Lx,Ly)*im;
-        triangle_dn_set=zeros(Lx,Ly)*im;
-
-        SS_x_set=zeros(Lx,Ly)*im;
-        SS_y_set=zeros(Lx,Ly)*im;
-        SS_diagonal_set=zeros(Lx,Ly)*im;
+        SS_x_set=torch.zeros(Lx,Ly)*1j;
+        SS_y_set=torch.zeros(Lx,Ly)*1j;
+        SS_diagonal_set=torch.zeros(Lx,Ly)*1j;
 
 
-
-        for cx=1:Lx
-            for cy=1:Ly
-
+        for cx in range(1,Lx+1):
+            for cy in range(1,Ly+1):
 
                 #expectation value for chirality operator
-                up_triangle=ob_up_triangle_iPESS(CTM_cell,chirality_S1,chirality_S2,chirality_S3,B_set,T_set, double_B_set, double_T_set,cx,cy,ctm_setting);#LD,RD,RU
-                dn_triangle=-ob_dn_triangle_iPESS(CTM_cell,chirality_S1,chirality_S2,chirality_S3,B_set,T_set, double_B_set, double_T_set,cx,cy,ctm_setting);#LD,LU,RU
+                up_triangle=ob_up_triangle_iPESS(CTM_cell,chirality_S1,chirality_S2,chirality_S3, chirality_string12, chirality_string23, B_set,T_set, double_B_set, double_T_set,cx,cy,Lx,Ly);#LD,RD,RU
+                dn_triangle=-ob_dn_triangle_iPESS(CTM_cell,chirality_S1,chirality_S2,chirality_S3, chirality_string12, chirality_string23,B_set,T_set, double_B_set, double_T_set,cx,cy,Lx,Ly);#LD,LU,RU
 
                 #expectation value for Heisenberg operator
-                SS_x=hopping_x_iPESS_no_sign(CTM_cell,Sa,Sb,B_set,T_set, double_B_set, double_T_set,cx,cy,ctm_setting);
-                SS_y=hopping_y_iPESS_no_sign(CTM_cell,Sa,Sb,B_set,T_set, double_B_set, double_T_set,cx,cy,ctm_setting);
-                SS_diagonal=hopping_diagonala_iPESS_no_sign(CTM_cell,Sa,Sb,B_set,T_set, double_B_set, double_T_set,cx,cy,ctm_setting);
+                SS_x=hopping_x_iPESS_no_sign(CTM_cell,Sa,Sb,SS_string,B_set,T_set, double_B_set, double_T_set,cx,cy,Lx,Ly);
+                SS_y=hopping_y_iPESS_no_sign(CTM_cell,Sa,Sb,SS_string,B_set,T_set, double_B_set, double_T_set,cx,cy,Lx,Ly);
+                SS_diagonal=hopping_diagonala_iPESS_no_sign(CTM_cell,Sa,Sb,SS_string,B_set,T_set, double_B_set, double_T_set,cx,cy,Lx,Ly);
 
-                @ignore_derivatives triangle_up_set[cx,cy]=up_triangle;
-                @ignore_derivatives triangle_dn_set[cx,cy]=dn_triangle;
-                @ignore_derivatives SS_x_set[cx,cy]=SS_x;
-                @ignore_derivatives SS_y_set[cx,cy]=SS_y;
-                @ignore_derivatives SS_diagonal_set[cx,cy]=SS_diagonal;
+                triangle_up_set[cx-1,cy-1]=up_triangle;
+                triangle_dn_set[cx-1,cy-1]=dn_triangle;
+                SS_x_set[cx-1,cy-1]=SS_x;
+                SS_y_set[cx-1,cy-1]=SS_y;
+                SS_diagonal_set[cx-1,cy-1]=SS_diagonal;
 
-            end
-        end
 
         return triangle_up_set,triangle_dn_set,SS_x_set,SS_y_set,SS_diagonal_set
-    end
-end
+    
+

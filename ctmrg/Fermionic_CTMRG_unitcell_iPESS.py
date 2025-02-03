@@ -244,6 +244,7 @@ def Fermionic_CTMRG_cell_iPESS(B_set,T_set,init,CTM0, ctm_setting,global_args):
     if init.reconstruct_CTM:
         CTM_cell= init_CTM_cell(B_set,T_set,ctm_setting,global_args);
     else:
+        #copy.deepcopy is not for autograd
         CTM_cell=copy.deepcopy(CTM0);
     # end
     
