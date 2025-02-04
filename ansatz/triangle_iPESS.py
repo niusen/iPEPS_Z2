@@ -38,7 +38,7 @@ class IPESS_TRIANGLE():
 
 
 def load_triangle_iPESS(filenm,config_kwargs):
-    with open(filenm+'.JSON') as f:
+    with open(filenm+'.json') as f:
         data = json.load(f)
         # print(data)
 
