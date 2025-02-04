@@ -4,6 +4,7 @@ import sys
 import copy
 from collections import OrderedDict
 from config.settings import *
+from torch.utils.checkpoint import checkpoint
 
 def spectrum_conv_check(ss_old,C_new):
     U,spec,V=yastn.linalg.svd(C_new,  svd_on_cpu=True)
@@ -335,7 +336,8 @@ def Fermionic_CTMRG_cell_iPESS(B_set,T_set,init,CTM0, ctm_setting,global_args):
         direction_order=[3,4,1,2];
         
         for direction in direction_order:
-            Cset_cell,Tset_cell=CTM_ite_cell(Cset_cell, Tset_cell, double_B_cell,double_T_cell, chi, direction,ctm_setting,global_args);
+            #Cset_cell,Tset_cell=CTM_ite_cell(Cset_cell, Tset_cell, double_B_cell,double_T_cell, chi, direction,ctm_setting,global_args);
+            Cset_cell,Tset_cell=checkpoint(CTM_ite_cell, Cset_cell, Tset_cell, double_B_cell,double_T_cell, chi, direction,ctm_setting,global_args)
         # end
         
         with torch.no_grad():

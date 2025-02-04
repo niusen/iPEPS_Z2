@@ -34,7 +34,7 @@ global_args.Ly=Ly;
 ls_ctm_args= CTMARGS()
 ls_ctm_args.CTM_ite_info=True
 ls_ctm_args.chi=chi;
-ls_ctm_args.CTM_ite_nums=0;
+ls_ctm_args.CTM_ite_nums=10;
 
 opt_args= OPTARGS()
 
@@ -68,13 +68,13 @@ CTM_cell=init_CTM_cell(B_set,T_set,ls_ctm_args, global_args);
 CTM0=None;
 CTM_cell, double_B_set,double_T_set,ite_num,ite_err=Fermionic_CTMRG_cell_iPESS(B_set,T_set,init,CTM_cell, ls_ctm_args, global_args);
 
-# E_total,  ex_set, ey_set, e_diagonala_set, e0_set, eU_set=evaluate_ob_cell_iPESS(parameters, B_set,T_set, double_B_set, double_T_set, CTM_cell, energy_setting, config_kwargs, global_args);
-# print(E_total)
-# print(ex_set)
-# print(ey_set)
-# print(e_diagonala_set)
-# print(e0_set)
-# print(eU_set)
+E_total,  ex_set, ey_set, e_diagonala_set, e0_set, eU_set=evaluate_ob_cell_iPESS(parameters, B_set,T_set, double_B_set, double_T_set, CTM_cell, energy_setting, config_kwargs, global_args);
+print(E_total)
+print(ex_set)
+print(ey_set)
+print(e_diagonala_set)
+print(e0_set)
+print(eU_set)
 
 # sx_set,sy_set,sz_set=evaluate_spin_cell_iPESS(B_set,T_set, double_B_set, double_T_set, CTM_cell, config_kwargs, global_args);
 # print(sx_set)
@@ -82,12 +82,12 @@ CTM_cell, double_B_set,double_T_set,ite_num,ite_err=Fermionic_CTMRG_cell_iPESS(B
 # print(sz_set)
 
 
-triangle_up_set,triangle_dn_set,SS_x_set,SS_y_set,SS_diagonal_set=evaluate_spin_ob_cell_iPESS(B_set,T_set, double_B_set, double_T_set, CTM_cell, energy_setting, config_kwargs, global_args);
-print(triangle_up_set)
-print(triangle_dn_set)
-print(SS_x_set)
-print(SS_y_set)
-print(SS_diagonal_set)
+# triangle_up_set,triangle_dn_set,SS_x_set,SS_y_set,SS_diagonal_set=evaluate_spin_ob_cell_iPESS(B_set,T_set, double_B_set, double_T_set, CTM_cell, energy_setting, config_kwargs, global_args);
+# print(triangle_up_set)
+# print(triangle_dn_set)
+# print(SS_x_set)
+# print(SS_y_set)
+# print(SS_diagonal_set)
 
 
 
