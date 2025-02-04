@@ -34,7 +34,7 @@ global_args.Ly=Ly;
 ls_ctm_args= CTMARGS()
 ls_ctm_args.CTM_ite_info=True
 ls_ctm_args.chi=chi;
-ls_ctm_args.CTM_ite_nums=10;
+ls_ctm_args.CTM_ite_nums=0;
 
 opt_args= OPTARGS()
 

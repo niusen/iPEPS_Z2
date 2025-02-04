@@ -1126,11 +1126,11 @@ def evaluate_ob_cell_iPESS(parameters, B_set,T_set, double_B_set, double_T_set, 
         for cx in range(1,Lx+1):
             for cy in range(1,Ly+1):
 
-                ex=hopping_x_iPESS(CTM_cell, Cdag, C, CdagC_string, B_set,T_set, double_B_set, double_T_set,cx,cy,Lx,Ly);
-                ey=hopping_y_iPESS(CTM_cell, Cdag, C, CdagC_string, B_set,T_set, double_B_set, double_T_set,cx,cy,Lx,Ly);
-                e_diagonala=hopping_diagonala_iPESS(CTM_cell, Cdag, C, CdagC_string, B_set,T_set, double_B_set, double_T_set,cx,cy,Lx,Ly);
-                e0=ob_onsite_iPESS(CTM_cell,N_occu, B_set,T_set, double_B_set, double_T_set,cx,cy,Lx,Ly);
-                eU=ob_onsite_iPESS(CTM_cell,n_double-(1/2)*N_occu+(1/4)*Ident,B_set,T_set, double_B_set, double_T_set,cx,cy,Lx,Ly);
+                ex=checkpoint(hopping_x_iPESS, CTM_cell, Cdag, C, CdagC_string, B_set,T_set, double_B_set, double_T_set,cx,cy,Lx,Ly, use_reentrant=True);
+                ey=checkpoint(hopping_y_iPESS, CTM_cell, Cdag, C, CdagC_string, B_set,T_set, double_B_set, double_T_set,cx,cy,Lx,Ly, use_reentrant=True);
+                e_diagonala=checkpoint(hopping_diagonala_iPESS, CTM_cell, Cdag, C, CdagC_string, B_set,T_set, double_B_set, double_T_set,cx,cy,Lx,Ly, use_reentrant=True);
+                e0=checkpoint(ob_onsite_iPESS, CTM_cell,N_occu, B_set,T_set, double_B_set, double_T_set,cx,cy,Lx,Ly, use_reentrant=True);
+                eU=checkpoint(ob_onsite_iPESS, CTM_cell,n_double-(1/2)*N_occu+(1/4)*Ident,B_set,T_set, double_B_set, double_T_set,cx,cy,Lx,Ly, use_reentrant=True);
                 with torch.no_grad():
                     ex_set[cx-1,cy-1]=ex;
                     ey_set[cx-1,cy-1]=ey;
