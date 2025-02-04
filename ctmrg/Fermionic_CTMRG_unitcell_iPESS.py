@@ -336,8 +336,11 @@ def Fermionic_CTMRG_cell_iPESS(B_set,T_set,init,CTM0, ctm_setting,global_args):
         direction_order=[3,4,1,2];
         
         for direction in direction_order:
+            print(direction)
             #Cset_cell,Tset_cell=CTM_ite_cell(Cset_cell, Tset_cell, double_B_cell,double_T_cell, chi, direction,ctm_setting,global_args);
-            Cset_cell,Tset_cell=checkpoint(CTM_ite_cell, Cset_cell, Tset_cell, double_B_cell,double_T_cell, chi, direction,ctm_setting,global_args, use_reentrant=True)
+            print(Cset_cell['1,1']['C1'].requires_grad)
+            Cset_cell,Tset_cell=checkpoint(CTM_ite_cell, Cset_cell, Tset_cell, double_B_cell,double_T_cell, chi, direction,ctm_setting,global_args, use_reentrant=False)
+            print(Cset_cell['1,1']['C1'].requires_grad)
         # end
         
         with torch.no_grad():

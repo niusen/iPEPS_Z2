@@ -34,7 +34,7 @@ global_args.Ly=Ly;
 ls_ctm_args= CTMARGS()
 ls_ctm_args.CTM_ite_info=True
 ls_ctm_args.chi=chi;
-ls_ctm_args.CTM_ite_nums=0;
+ls_ctm_args.CTM_ite_nums=1;
 
 opt_args= OPTARGS()
 
@@ -55,6 +55,9 @@ state.require_grad(True)
 
 # print(B_set.keys())
 # print(T_set.keys())
+B_set=state.B_set
+T_set=state.T_set
+print(B_set['1,1'].requires_grad)
 CTM_cell=init_CTM_cell(B_set,T_set,ls_ctm_args, global_args);
 
 
@@ -76,6 +79,8 @@ print(e_diagonala_set)
 print(e0_set)
 print(eU_set)
 
+E_total.backward()
+print(B_set['1,1'].grad().to_dense())
 # sx_set,sy_set,sz_set=evaluate_spin_cell_iPESS(B_set,T_set, double_B_set, double_T_set, CTM_cell, config_kwargs, global_args);
 # print(sx_set)
 # print(sy_set)

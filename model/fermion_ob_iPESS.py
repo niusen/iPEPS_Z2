@@ -1121,16 +1121,16 @@ def evaluate_ob_cell_iPESS(parameters, B_set,T_set, double_B_set, double_T_set, 
             eU_set=torch.zeros(Lx,Ly)*1j;
 
         
-        E_total=0;
-
+        # E_total=0;
+        E_total=torch.zeros((1), dtype=B_set['1,1'].dtype,device=B_set['1,1'].device,requires_grad=True);
         for cx in range(1,Lx+1):
             for cy in range(1,Ly+1):
 
-                ex=checkpoint(hopping_x_iPESS, CTM_cell, Cdag, C, CdagC_string, B_set,T_set, double_B_set, double_T_set,cx,cy,Lx,Ly, use_reentrant=True);
-                ey=checkpoint(hopping_y_iPESS, CTM_cell, Cdag, C, CdagC_string, B_set,T_set, double_B_set, double_T_set,cx,cy,Lx,Ly, use_reentrant=True);
-                e_diagonala=checkpoint(hopping_diagonala_iPESS, CTM_cell, Cdag, C, CdagC_string, B_set,T_set, double_B_set, double_T_set,cx,cy,Lx,Ly, use_reentrant=True);
-                e0=checkpoint(ob_onsite_iPESS, CTM_cell,N_occu, B_set,T_set, double_B_set, double_T_set,cx,cy,Lx,Ly, use_reentrant=True);
-                eU=checkpoint(ob_onsite_iPESS, CTM_cell,n_double-(1/2)*N_occu+(1/4)*Ident,B_set,T_set, double_B_set, double_T_set,cx,cy,Lx,Ly, use_reentrant=True);
+                ex=checkpoint(hopping_x_iPESS, CTM_cell, Cdag, C, CdagC_string, B_set,T_set, double_B_set, double_T_set,cx,cy,Lx,Ly, use_reentrant=False);
+                ey=checkpoint(hopping_y_iPESS, CTM_cell, Cdag, C, CdagC_string, B_set,T_set, double_B_set, double_T_set,cx,cy,Lx,Ly, use_reentrant=False);
+                e_diagonala=checkpoint(hopping_diagonala_iPESS, CTM_cell, Cdag, C, CdagC_string, B_set,T_set, double_B_set, double_T_set,cx,cy,Lx,Ly, use_reentrant=False);
+                e0=checkpoint(ob_onsite_iPESS, CTM_cell,N_occu, B_set,T_set, double_B_set, double_T_set,cx,cy,Lx,Ly, use_reentrant=False);
+                eU=checkpoint(ob_onsite_iPESS, CTM_cell,n_double-(1/2)*N_occu+(1/4)*Ident,B_set,T_set, double_B_set, double_T_set,cx,cy,Lx,Ly, use_reentrant=False);
                 with torch.no_grad():
                     ex_set[cx-1,cy-1]=ex;
                     ey_set[cx-1,cy-1]=ey;
@@ -1143,7 +1143,7 @@ def evaluate_ob_cell_iPESS(parameters, B_set,T_set, double_B_set, double_T_set, 
                     E_total=E_total+torch.real(t1*(cmath.exp(1j*ϕ)*ex)*2+t1*(ey)*2+t2*(e_diagonala)*2 -μ*e0 +U*eU);
 
         E_total=E_total/(Lx*Ly);
-        return E_total,  ex_set, ey_set, e_diagonala_set, e0_set, eU_set
+        return torch.real(E_total),  ex_set, ey_set, e_diagonala_set, e0_set, eU_set
     
 
 
