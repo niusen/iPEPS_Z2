@@ -513,6 +513,23 @@ def build_corner_MMlow_reflect(coord_,direction_,double_B_cell_,double_T_cell_,C
     return MMlow_reflect_
 
 
+def final_CTM_update(Cset_cell,Tset_cell, M1tem_cell,M5tem_cell,M7tem_cell, coord,direction,Lx,Ly):
+    Pos=convert_cell_posit(coord[1-1],coord[2-1],1,0,direction, Lx,Ly);
+    # Cset_cell[str(Pos[1-1])+','+str(Pos[2-1])]['C'+str(mod1(direction,4))]=M1tem_cell[str(Pos[1-1])+','+str(Pos[2-1])];
+    Cset_new=update_CTM_C(Cset_cell[str(Pos[1-1])+','+str(Pos[2-1])],M1tem_cell[str(Pos[1-1])+','+str(Pos[2-1])],mod1(direction,4))
+    Cset_cell=update_cell(Cset_cell,Cset_new, Pos[1-1],Pos[2-1],Lx,Ly)
+
+    Pos=convert_cell_posit(coord[1-1],coord[2-1],1,2,direction, Lx,Ly);
+    # Tset_cell[str(Pos[1-1])+','+str(Pos[2-1])]['T'+str(mod1(direction-1,4))]=M5tem_cell[str(Pos[1-1])+','+str(Pos[2-1])];
+    Tset_new=update_CTM_T(Tset_cell[str(Pos[1-1])+','+str(Pos[2-1])],M5tem_cell[str(Pos[1-1])+','+str(Pos[2-1])],mod1(direction-1,4))
+    Tset_cell=update_cell(Tset_cell,Tset_new, Pos[1-1],Pos[2-1],Lx,Ly)
+
+    Pos=convert_cell_posit(coord[1-1],coord[2-1],1,3,direction, Lx,Ly);
+    # Cset_cell[str(Pos[1-1])+','+str(Pos[2-1])]['C'+str(mod1(direction-1,4))]=M7tem_cell[str(Pos[1-1])+','+str(Pos[2-1])];
+    Cset_new=update_CTM_C(Cset_cell[str(Pos[1-1])+','+str(Pos[2-1])],M7tem_cell[str(Pos[1-1])+','+str(Pos[2-1])],mod1(direction-1,4))
+    Cset_cell=update_cell(Cset_cell,Cset_new, Pos[1-1],Pos[2-1],Lx,Ly)
+    return Cset_cell,Tset_cell
+
 
 def ctm_update_single_cx(cx,cy_max, Cset_cell, Tset_cell, double_B_cell,double_T_cell, chi, direction, ctm_setting, global_args):
     Lx=global_args.Lx;
@@ -654,22 +671,10 @@ def ctm_update_single_cx(cx,cy_max, Cset_cell, Tset_cell, double_B_cell,double_T
 
     for cy in range(1,cy_max+1):
         coord=[cx,cy];
+        Cset_cell,Tset_cell=checkpoint(final_CTM_update, Cset_cell,Tset_cell,M1tem_cell,M5tem_cell,M7tem_cell, coord,direction,Lx,Ly, use_reentrant=False)
 
 
-        Pos=convert_cell_posit(coord[1-1],coord[2-1],1,0,direction, Lx,Ly);
-        # Cset_cell[str(Pos[1-1])+','+str(Pos[2-1])]['C'+str(mod1(direction,4))]=M1tem_cell[str(Pos[1-1])+','+str(Pos[2-1])];
-        Cset_new=update_CTM_C(Cset_cell[str(Pos[1-1])+','+str(Pos[2-1])],M1tem_cell[str(Pos[1-1])+','+str(Pos[2-1])],mod1(direction,4))
-        Cset_cell=update_cell(Cset_cell,Cset_new, Pos[1-1],Pos[2-1],Lx,Ly)
 
-        Pos=convert_cell_posit(coord[1-1],coord[2-1],1,2,direction, Lx,Ly);
-        # Tset_cell[str(Pos[1-1])+','+str(Pos[2-1])]['T'+str(mod1(direction-1,4))]=M5tem_cell[str(Pos[1-1])+','+str(Pos[2-1])];
-        Tset_new=update_CTM_T(Tset_cell[str(Pos[1-1])+','+str(Pos[2-1])],M5tem_cell[str(Pos[1-1])+','+str(Pos[2-1])],mod1(direction-1,4))
-        Tset_cell=update_cell(Tset_cell,Tset_new, Pos[1-1],Pos[2-1],Lx,Ly)
-
-        Pos=convert_cell_posit(coord[1-1],coord[2-1],1,3,direction, Lx,Ly);
-        # Cset_cell[str(Pos[1-1])+','+str(Pos[2-1])]['C'+str(mod1(direction-1,4))]=M7tem_cell[str(Pos[1-1])+','+str(Pos[2-1])];
-        Cset_new=update_CTM_C(Cset_cell[str(Pos[1-1])+','+str(Pos[2-1])],M7tem_cell[str(Pos[1-1])+','+str(Pos[2-1])],mod1(direction-1,4))
-        Cset_cell=update_cell(Cset_cell,Cset_new, Pos[1-1],Pos[2-1],Lx,Ly)
 
     return Cset_cell,Tset_cell
 
@@ -695,8 +700,8 @@ def CTM_ite_cell_continuous_update(Cset_cell, Tset_cell, double_B_cell,double_T_
     cy_max=cx_cy_matrix[direction-1,2-1];
 
     for cx in range(1,cx_max+1):
-        Cset_cell,Tset_cell=ctm_update_single_cx(cx,cy_max,Cset_cell, Tset_cell, double_B_cell,double_T_cell, chi, direction, ctm_setting, global_args);
-
+        # Cset_cell,Tset_cell=ctm_update_single_cx(cx,cy_max,Cset_cell, Tset_cell, double_B_cell,double_T_cell, chi, direction, ctm_setting, global_args);
+        Cset_cell,Tset_cell=checkpoint(ctm_update_single_cx, cx,cy_max,Cset_cell, Tset_cell, double_B_cell,double_T_cell, chi, direction, ctm_setting, global_args, use_reentrant=False);
     return Cset_cell,Tset_cell
 
 
