@@ -58,6 +58,10 @@ state.require_grad(True)
 B_set=state.B_set
 T_set=state.T_set
 print(B_set['1,1'].requires_grad)
+
+# a,b=yastn.Tensor.compress_to_1d(B_set['1,1'])
+# tnew=yastn.decompress_from_1d(a,b)
+
 CTM_cell=init_CTM_cell(B_set,T_set,ls_ctm_args, global_args);
 
 
