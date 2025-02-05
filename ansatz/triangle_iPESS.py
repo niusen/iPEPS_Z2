@@ -35,6 +35,21 @@ class IPESS_TRIANGLE():
     def build_double_layer_iPESS(self):
         B_double_set=OrderedDict()
         T_double_set=OrderedDict()
+    def copy(self, preserve_grad=False):
+        B_set_new=OrderedDict()
+        T_set_new=OrderedDict()
+        for key in self.B_set:
+            if preserve_grad:
+                B_set_new.update({key: self.B_set[key].clone()})
+                T_set_new.update({key: self.T_set[key].clone()})
+            else:
+                B_set_new.update({key: self.B_set[key].copy()})
+                T_set_new.update({key: self.T_set[key].copy()})
+
+        return IPESS_TRIANGLE(B_set_new, T_set_new, self.global_args)
+
+            
+            
 
 
 def load_triangle_iPESS(filenm,config_kwargs):
