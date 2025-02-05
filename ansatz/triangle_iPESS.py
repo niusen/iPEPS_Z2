@@ -1,4 +1,4 @@
-import numpy
+import numpy,math
 import torch
 import json
 from collections import OrderedDict
@@ -31,6 +31,13 @@ class IPESS_TRIANGLE():
             for cy in range(1,self.Ly+1):
                 self.B_set[str(cx)+','+str(cy)]=self.B_set[str(cx)+','+str(cy)]/(yastn.linalg.norm(self.B_set[str(cx)+','+str(cy)]))
                 self.T_set[str(cx)+','+str(cy)]=self.T_set[str(cx)+','+str(cy)]/(yastn.linalg.norm(self.T_set[str(cx)+','+str(cy)]))
+    def norm(self):
+        Norm=0;
+        for cx in range(1,self.Lx+1):
+            for cy in range(1,self.Ly+1):
+                Norm=Norm+ ((yastn.linalg.norm(self.B_set[str(cx)+','+str(cy)])).item())**2
+                Norm=Norm+ ((yastn.linalg.norm(self.T_set[str(cx)+','+str(cy)])).item())**2
+        return math.sqrt(Norm)
 
     def build_double_layer_iPESS(self):
         B_double_set=OrderedDict()
