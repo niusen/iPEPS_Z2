@@ -333,7 +333,6 @@ def Fermionic_CTMRG_cell_iPESS(B_set,T_set,init,CTM0, ctm_setting,global_args):
         ite_num=ci;
         #direction_order=[1,2,3,4];
         #direction_order=[4,1,2,3];
-        #direction_order=[3,4,1,2];
         direction_order=[3,4,1,2];
         
         for direction in direction_order:
@@ -592,16 +591,9 @@ def ctm_update_single_cx(cx,cy_max, Cset_cell, Tset_cell, double_B_cell,double_T
 
         # uM,sM,vM = my_tsvd(M; trunc=truncdim(chi+chi_extra));
         chi_extra=3;
-        M=M/(yastn.linalg.norm(M))
         uM,sM,vM = yastn.linalg.svd_with_truncation(M, axes=((0, 1), (2, 3)), D_total=chi+chi_extra,svd_on_cpu=True, truncate_multiplets=True, tol=ctm_setting.CTM_trun_tol);
 
-        # Legs=M.get_legs();
-        # config_kwargs = {"backend": "torch", "default_dtype": 'complex128', 'default_device': 'cuda', 'Lx':6, 'Ly':6}
-        # config_Z2 = yastn.make_config(sym='Z2',fermionic=True, **config_kwargs)
-        # CdagC_string = yastn.eye(config=config_Z2,legs=Legs[2], isdiag=False)
-        #sM_1d,bb=yastn.Tensor.compress_to_1d(sM);
-        #print(sM_1d)
-
+        #println(norm(uM*sM*vM-M)/norm(M));
         #############################################
     
 
@@ -610,11 +602,7 @@ def ctm_update_single_cx(cx,cy_max, Cset_cell, Tset_cell, double_B_cell,double_T
         sM=sM/sM_norm;
         
         #sM_inv_sqrt=sdiag_inv_sqrt(sM);
-        # sM_inv_sqrt=sM.rsqrt(cutoff=1e-10);
-        sM_inv_sqrt=sM.rsqrt(cutoff=ctm_setting.CTM_trun_tol);
-        # sM_inv_sqrt=sM_inv_sqrt.rsqrt(cutoff=1e-10);
-        #sM_inv_sqrt_1d,bb=yastn.Tensor.compress_to_1d(sM_inv_sqrt);
-        #print(sM_inv_sqrt_1d)
+        sM_inv_sqrt=sM.rsqrt(cutoff=1e-10);
 
         # PM_inv=RMlow*vM'*sM_inv_sqrt;
         vMp=vM.conj();
