@@ -202,8 +202,8 @@ def save_triangle_iPESS(Bm_set, Tm_set, filenm, config_kwargs):
             bm=yastn_to_dict(bm)
             tm=yastn_to_dict(tm)
             
-            B_set.update({str(cx+1)+','+str(cy+1):bm})
-            T_set.update({str(cx+1)+','+str(cy+1):tm})
+            B_set.update({str(cx)+','+str(cy):bm})
+            T_set.update({str(cx)+','+str(cy):tm})
 
     with open(filenm+'.json', "w") as f:
         json.dump({'T_set':T_set,'B_set':B_set}, f)

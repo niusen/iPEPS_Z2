@@ -6,6 +6,9 @@ from ctmrg.Fermionic_CTMRG_unitcell_iPESS import *
 from model.fermion_ob_iPESS import *
 from config.settings import *
 from config.config import *
+import time
+
+
 
 def random_tensor_sign(T):
     T=T.copy();
@@ -66,7 +69,10 @@ def cost_fun(parameters,state, ls_ctm_args, energy_setting, global_args, config_
     return E_total
 def get_grad(parameters,state, ls_ctm_args, energy_setting, global_args, config_kwargs):
     E=cost_fun(parameters,state, ls_ctm_args, energy_setting, global_args, config_kwargs)
+    start_time_grad = time.time()
     E.backward()
+    end_grad = time.time()
+    print('time consumed on computing grad: '+time.strftime("%H hours, %M minuts, %S seconds", time.gmtime(end_grad - start_time_grad)))
     state.require_grad(False)
 
     B_set_grad=OrderedDict()
@@ -106,6 +112,14 @@ def fx(parameters,state, ls_ctm_args, energy_setting, global_args, config_kwargs
     print(e_diagonala_set.tolist())
     print(e0_set.tolist())
     print(eU_set.tolist())
+
+    print('magnetization:')
+    sx_set,sy_set,sz_set=evaluate_spin_cell_iPESS(B_set,T_set, double_B_set, double_T_set, CTM_cell, config_kwargs, global_args);
+    print(sx_set.tolist())
+    print(sy_set.tolist())
+    print(sz_set.tolist())
+    S2=torch.sqrt(sx_set**2+sy_set**2+sz_set**2)
+    print(S2.tolist())
     return E_total
 
 
@@ -122,6 +136,8 @@ def stochastic_opt(parameters, D,chi, x0, ls_ctm_args, energy_setting, global_ar
     gnorm=100;
     E_min=100;
     while (iter < maxiter) & (gnorm > gtol):
+        start_time = time.time()
+
         print("optim iteration "+str(iter))
         x.normalize();
         state_grad,E_grad=get_grad(parameters, x, ls_ctm_args, energy_setting, global_args, config_kwargs);
@@ -137,6 +153,8 @@ def stochastic_opt(parameters, D,chi, x0, ls_ctm_args, energy_setting, global_ar
         filenm='Z2_D'+str(D)+'_chi'+str(chi);
         if E_min==E_updated:
             save_triangle_iPESS(x_updated.B_set, x_updated.T_set, filenm, config_kwargs)
+            end_ = time.time()
+            print('time consumed: '+time.strftime("%H hours, %M minuts, %S seconds", time.gmtime(end_ - start_time)))
         x=x_updated;
 
         iter += 1

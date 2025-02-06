@@ -38,6 +38,7 @@ ls_ctm_args= CTMARGS()
 ls_ctm_args.CTM_ite_info=True
 ls_ctm_args.chi=chi;
 ls_ctm_args.CTM_ite_nums=1;
+ls_ctm_args.CTM_trun_tol=1e-8
 print(ls_ctm_args, flush=True)
 
 opt_args= OPTARGS()
