@@ -209,20 +209,63 @@ def save_triangle_iPESS(Bm_set, Tm_set, filenm, config_kwargs):
         json.dump({'T_set':T_set,'B_set':B_set}, f)
 
  
-# # config_kwargs = {"backend": "np"}
-# config_kwargs = {"backend": "torch", "default_dtype": 'complex128', 'default_device': 'cuda', 'Lx':6, 'Ly':6}
-
-# filenm='SU_iPESS_Z2_csl_D4'
-# Bm_set,Tm_set=load_triangle_iPESS(filenm,config_kwargs)
-
-# filenm1='SU_iPESS_Z2_D4'
-# save_triangle_iPESS(Bm_set, Tm_set, filenm1, config_kwargs)
 
 
-# Bm_set2,Tm_set2=load_triangle_iPESS(filenm1,config_kwargs)
+def CTM_to_device(CTM_set,Device,global_args):
+    for cx in range(1,global_args.Lx+1):
+        for cy in range(1,global_args.Ly+1):
+            CTM_set['Cset'][str(cx)+','+str(cy)]['C1']=CTM_set['Cset'][str(cx)+','+str(cy)]['C1'].to(Device)
+            CTM_set['Cset'][str(cx)+','+str(cy)]['C2']=CTM_set['Cset'][str(cx)+','+str(cy)]['C2'].to(Device)
+            CTM_set['Cset'][str(cx)+','+str(cy)]['C3']=CTM_set['Cset'][str(cx)+','+str(cy)]['C3'].to(Device)
+            CTM_set['Cset'][str(cx)+','+str(cy)]['C4']=CTM_set['Cset'][str(cx)+','+str(cy)]['C4'].to(Device)
+            CTM_set['Tset'][str(cx)+','+str(cy)]['T1']=CTM_set['Tset'][str(cx)+','+str(cy)]['T1'].to(Device)
+            CTM_set['Tset'][str(cx)+','+str(cy)]['T2']=CTM_set['Tset'][str(cx)+','+str(cy)]['T2'].to(Device)
+            CTM_set['Tset'][str(cx)+','+str(cy)]['T3']=CTM_set['Tset'][str(cx)+','+str(cy)]['T3'].to(Device)
+            CTM_set['Tset'][str(cx)+','+str(cy)]['T4']=CTM_set['Tset'][str(cx)+','+str(cy)]['T4'].to(Device)
+    return CTM_set
 
-# #verify save and reload
-# for cx in range(0,6):
-#     for cy in range(0,6):
-#         print(yastn.linalg.norm(Bm_set[str(cx)+','+str(cy)]-Bm_set2[str(cx)+','+str(cy)]));
-#         print(yastn.linalg.norm(Tm_set[str(cx)+','+str(cy)]-Tm_set2[str(cx)+','+str(cy)]));
+def CTM_detach(CTM_set,global_args):
+    for cx in range(1,global_args.Lx+1):
+        for cy in range(1,global_args.Ly+1):
+            CTM_set['Cset'][str(cx)+','+str(cy)]['C1']=CTM_set['Cset'][str(cx)+','+str(cy)]['C1'].detach()
+            CTM_set['Cset'][str(cx)+','+str(cy)]['C2']=CTM_set['Cset'][str(cx)+','+str(cy)]['C2'].detach()
+            CTM_set['Cset'][str(cx)+','+str(cy)]['C3']=CTM_set['Cset'][str(cx)+','+str(cy)]['C3'].detach()
+            CTM_set['Cset'][str(cx)+','+str(cy)]['C4']=CTM_set['Cset'][str(cx)+','+str(cy)]['C4'].detach()
+            CTM_set['Tset'][str(cx)+','+str(cy)]['T1']=CTM_set['Tset'][str(cx)+','+str(cy)]['T1'].detach()
+            CTM_set['Tset'][str(cx)+','+str(cy)]['T2']=CTM_set['Tset'][str(cx)+','+str(cy)]['T2'].detach()
+            CTM_set['Tset'][str(cx)+','+str(cy)]['T3']=CTM_set['Tset'][str(cx)+','+str(cy)]['T3'].detach()
+            CTM_set['Tset'][str(cx)+','+str(cy)]['T4']=CTM_set['Tset'][str(cx)+','+str(cy)]['T4'].detach()
+    return CTM_set
+
+def CTM_copy(CTM_set,global_args):
+    Cset_new=OrderedDict()
+    Tset_new=OrderedDict()
+    CTM_set_new=OrderedDict()
+    for cx in range(1,global_args.Lx+1):
+        for cy in range(1,global_args.Ly+1):
+            Cs=OrderedDict()
+            Ts=OrderedDict()
+            Cs.update({'C1': CTM_set['Cset'][str(cx)+','+str(cy)]['C1'].clone() })
+            Cs.update({'C2': CTM_set['Cset'][str(cx)+','+str(cy)]['C2'].clone() })
+            Cs.update({'C3': CTM_set['Cset'][str(cx)+','+str(cy)]['C3'].clone() })
+            Cs.update({'C4': CTM_set['Cset'][str(cx)+','+str(cy)]['C4'].clone() })
+            Ts.update({'T1': CTM_set['Tset'][str(cx)+','+str(cy)]['T1'].clone() })
+            Ts.update({'T2': CTM_set['Tset'][str(cx)+','+str(cy)]['T2'].clone() })
+            Ts.update({'T3': CTM_set['Tset'][str(cx)+','+str(cy)]['T3'].clone() })
+            Ts.update({'T4': CTM_set['Tset'][str(cx)+','+str(cy)]['T4'].clone() })
+
+            Cset_new.update({str(cx)+','+str(cy):Cs})   
+            Tset_new.update({str(cx)+','+str(cy):Ts})      
+    CTM_set_new.update({'Cset':Cset_new})
+    CTM_set_new.update({'Tset':Tset_new})
+    return CTM_set_new
+
+def Cell_to_device(A_set,Device,global_args):
+    for cx in range(1,global_args.Lx+1):
+        for cy in range(1,global_args.Ly+1):
+            A_set[str(cx)+','+str(cy)]=A_set[str(cx)+','+str(cy)].to(Device)
+
+def Cell_detach(A_set,Device,global_args):
+    for cx in range(1,global_args.Lx+1):
+        for cy in range(1,global_args.Ly+1):
+            A_set[str(cx)+','+str(cy)]=A_set[str(cx)+','+str(cy)].detach()

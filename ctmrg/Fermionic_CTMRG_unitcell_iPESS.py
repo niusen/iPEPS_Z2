@@ -5,6 +5,7 @@ import copy
 from collections import OrderedDict
 from config.settings import *
 from torch.utils.checkpoint import checkpoint
+from ansatz.triangle_iPESS import *
 
 def spectrum_conv_check(ss_old,C_new):
     U,spec,V=yastn.linalg.svd(C_new,  svd_on_cpu=True)
@@ -246,7 +247,7 @@ def Fermionic_CTMRG_cell_iPESS(B_set,T_set,init,CTM0, ctm_setting,global_args):
         CTM_cell= init_CTM_cell(B_set,T_set,ctm_setting,global_args);
     else:
         #copy.deepcopy is not for autograd
-        CTM_cell=copy.deepcopy(CTM0);
+        CTM_cell=CTM_copy(CTM0,global_args)
     # end
     
     ss_old1_cell= torch.ones((Lx,Ly,chi*2),dtype=torch.float64, device=B_set['1,1'].device);
@@ -533,6 +534,8 @@ def final_CTM_update(Cset_cell,Tset_cell, M1tem_cell,M5tem_cell,M7tem_cell, coor
 
 
 def ctm_update_single_cx(cx,cy_max, Cset_cell, Tset_cell, double_B_cell,double_T_cell, chi, direction, ctm_setting, global_args):
+    def truncation_f(S):
+        return yastn.linalg.truncation_mask_multiplets(S, keep_multiplets=True, D_total=chi, tol=ctm_setting.CTM_trun_tol, tol_block=0.0, eps_multiplet=1.0e-8)
     Lx=global_args.Lx;
     Ly=global_args.Ly;
     PM_cell=initial_cell(Lx,Ly);
@@ -593,7 +596,10 @@ def ctm_update_single_cx(cx,cy_max, Cset_cell, Tset_cell, double_B_cell,double_T
         # uM,sM,vM = my_tsvd(M; trunc=truncdim(chi+chi_extra));
         chi_extra=3;
         M=M/(yastn.linalg.norm(M))
-        uM,sM,vM = yastn.linalg.svd_with_truncation(M, axes=((0, 1), (2, 3)), D_total=chi+chi_extra,svd_on_cpu=True, truncate_multiplets=True, tol=ctm_setting.CTM_trun_tol);
+
+
+        # uM,sM,vM = yastn.linalg.svd_with_truncation(M, axes=((0, 1), (2, 3)), D_total=chi+chi_extra,svd_on_cpu=True, truncate_multiplets=True, tol=ctm_setting.CTM_trun_tol);
+        uM,sM,vM = yastn.linalg.svd_with_truncation(M, axes=((0, 1), (2, 3)), D_total=chi+chi_extra, svd_on_cpu=True, tol=ctm_setting.CTM_trun_tol, mask_f=truncation_f);
 
         # Legs=M.get_legs();
         # config_kwargs = {"backend": "torch", "default_dtype": 'complex128', 'default_device': 'cuda', 'Lx':6, 'Ly':6}

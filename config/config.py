@@ -2,7 +2,59 @@ import torch
 import argparse
 import logging
 
+class MAINARGS():
+    r"""
+    Main simulation options. The default settings can be modified through 
+    command line arguments as follows ``--<option-name> desired-value``
 
+    :ivar omp_cores: number of OpenMP cores. Default: ``1``
+    :vartype omp_cores: int:
+    :ivar instate: input state file. Default: ``None``
+    :vartype instate: str or Path
+    :ivar instate_noise: magnitude of noise applied to the input state, if any. Default: ``0.0``
+    :vartype instate_noise: float
+    :ivar ipeps_init_type: initialization of the trial iPEPS state, if no ``instate`` is provided. Default: ``RANDOM``
+    :vartype ipeps_init_type: str
+    :ivar out_prefix: output file prefix. Default: ``output``
+    :vartype out_prefix: str
+    :ivar bond_dim: iPEPS auxiliary bond dimension. Default: ``1``
+    :vartype bond_dim: int
+    :ivar chi: environment bond dimension. Default: ``20``
+    :vartype chi: int
+    :ivar opt_max_iter: maximal number of optimization steps. Default: ``100``
+    :vartype opt_max_iter: int
+    :ivar opt_resume: resume from checkpoint file. Default: ``None``
+    :vartype opt_resume: str or Path
+    :ivar opt_resume_override_params: override optimizer parameters stored in checkpoint. Default: ``False``
+    :vartype opt_resume_override_params: bool
+    :ivar seed: PRNG seed. Default: ``0``
+    :vartype seed: int
+    """
+    def __init__(self):
+        self.opt_max_iter= 100
+        self.out_prefix=None
+        self.opt_resume=None
+        self.opt_resume_override_params=None
+
+    def __str__(self):
+        res=type(self).__name__+"\n"
+        for x in list(filter(lambda x: "__" not in x,dir(self))):
+            res+=f"{x}= {getattr(self,x)}\n"
+        return res[:-1]
+
+class LINESEARCH():
+
+    def __init__(self):
+        self.maxiter=100
+        self.gtol=1e-3
+        self.delta0=1e-3
+        self.alpha= 3/4
+
+    def __str__(self):
+        res=type(self).__name__+"\n"
+        for x in list(filter(lambda x: "__" not in x,dir(self))):
+            res+=f"{x}= {getattr(self,x)}\n"
+        return res[:-1]
 
 class GLOBALARGS():
 
@@ -20,7 +72,7 @@ class GLOBALARGS():
         for x in list(filter(lambda x: "__" not in x,dir(self))):
             res+=f"{x}= {getattr(self,x)}\n"
         return res[:-1]
-
+    
 class INITCTMARGS():
 
     def __init__(self):

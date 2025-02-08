@@ -39,12 +39,19 @@ global_args= GLOBALARGS()
 global_args.Lx=Lx;
 global_args.Ly=Ly;
 
+AD_ctm_args= CTMARGS()
+AD_ctm_args.CTM_ite_info=True
+AD_ctm_args.chi=chi;
+AD_ctm_args.CTM_ite_nums=10;
+AD_ctm_args.CTM_trun_tol=1e-8
+print(AD_ctm_args)
+
 ls_ctm_args= CTMARGS()
-ls_ctm_args.CTM_ite_info=True
+ls_ctm_args.CTM_ite_info=False
 ls_ctm_args.chi=chi;
 ls_ctm_args.CTM_ite_nums=10;
 ls_ctm_args.CTM_trun_tol=1e-8
-print(ls_ctm_args, flush=True)
+print(ls_ctm_args)
 
 opt_args= OPTARGS()
 
@@ -100,11 +107,12 @@ print(B_set['1,1'].requires_grad)
 
 
 
-
-maxiter=100;
-gtol=1e-3;
-delta=1e-3;
-stochastic_opt(parameters,D,chi, state, ls_ctm_args, energy_setting, global_args, config_kwargs,  delta, maxiter, gtol)
+ls=LINESEARCH()
+ls.maxiter=100;
+ls.gtol=1e-3;
+ls.delta0=1e-3;
+ls.alpha=3/4;
+stochastic_opt(parameters,D,chi, state, AD_ctm_args, ls_ctm_args, energy_setting, global_args, config_kwargs,  ls)
 
 
 

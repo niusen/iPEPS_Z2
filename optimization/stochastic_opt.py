@@ -50,13 +50,13 @@ def get_random_grad(x0,delta):
 
 ####################################
 
-def cost_fun(parameters,state, ls_ctm_args, energy_setting, global_args, config_kwargs):
+def cost_fun(parameters,state, ctm_args, energy_setting, global_args, config_kwargs):
     state.require_grad(True)
     B_set=state.B_set
     T_set=state.T_set
     init=INITCTMARGS()
     CTM0=None;
-    CTM_cell, double_B_set,double_T_set,ite_num,ite_err=Fermionic_CTMRG_cell_iPESS(B_set,T_set,init,CTM0, ls_ctm_args, global_args);
+    CTM_cell, double_B_set,double_T_set,ite_num,ite_err=Fermionic_CTMRG_cell_iPESS(B_set,T_set,init,CTM0, ctm_args, global_args);
 
     E_total,  ex_set, ey_set, e_diagonala_set, e0_set, eU_set=evaluate_ob_cell_iPESS(parameters, B_set,T_set, double_B_set, double_T_set, CTM_cell, energy_setting, config_kwargs, global_args);
     # print(E_total)
@@ -66,13 +66,13 @@ def cost_fun(parameters,state, ls_ctm_args, energy_setting, global_args, config_
     # print(e0_set)
     # print(eU_set)
     print('E='+str(E_total.item()))
-    return E_total
-def get_grad(parameters,state, ls_ctm_args, energy_setting, global_args, config_kwargs):
-    E=cost_fun(parameters,state, ls_ctm_args, energy_setting, global_args, config_kwargs)
+    return E_total,CTM_cell
+def get_grad(parameters,state, ctm_args, energy_setting, global_args, config_kwargs):
+    E, CTM_cell=cost_fun(parameters,state, ctm_args, energy_setting, global_args, config_kwargs)
     start_time_grad = time.time()
     E.backward()
     end_grad = time.time()
-    print('time consumed on computing grad: '+time.strftime("%H hours, %M minuts, %S seconds", time.gmtime(end_grad - start_time_grad)))
+    print('time on computing grad: '+time.strftime("%H hours, %M minuts, %S seconds", time.gmtime(end_grad - start_time_grad)))
     state.require_grad(False)
 
     B_set_grad=OrderedDict()
@@ -82,7 +82,7 @@ def get_grad(parameters,state, ls_ctm_args, energy_setting, global_args, config_
         T_set_grad.update({key: state.T_set[key].grad()})
     state_grad=IPESS_TRIANGLE(B_set_grad, T_set_grad, state.global_args);
     print("norm of grad:"+str(state_grad.norm()));
-    return state_grad,E
+    return state_grad,E, CTM_cell
 
     
 def subtract_state(state1,state2):
@@ -97,12 +97,13 @@ def subtract_state(state1,state2):
 
 
 
-def fx(parameters,state, ls_ctm_args, energy_setting, global_args, config_kwargs):
+def fx(parameters,state, CTM0, ls_ctm_args, energy_setting, global_args, config_kwargs):
     state.require_grad(False)
     B_set=state.B_set
     T_set=state.T_set
     init=INITCTMARGS()
-    CTM0=None;
+    init.reconstruct_CTM=False;
+    
     CTM_cell, double_B_set,double_T_set,ite_num,ite_err=Fermionic_CTMRG_cell_iPESS(B_set,T_set,init,CTM0, ls_ctm_args, global_args);
 
     E_total,  ex_set, ey_set, e_diagonala_set, e0_set, eU_set=evaluate_ob_cell_iPESS(parameters, B_set,T_set, double_B_set, double_T_set, CTM_cell, energy_setting, config_kwargs, global_args);
@@ -124,7 +125,7 @@ def fx(parameters,state, ls_ctm_args, energy_setting, global_args, config_kwargs
 
 
 
-def stochastic_opt(parameters, D,chi, x0, ls_ctm_args, energy_setting, global_args, config_kwargs,  delta, maxiter, gtol):
+def stochastic_opt(parameters, D,chi, x0, AD_ctm_args, ls_ctm_args, energy_setting, global_args, config_kwargs, ls):
 
     print("stochastic optimization")
     print("D="+str(D));
@@ -132,33 +133,46 @@ def stochastic_opt(parameters, D,chi, x0, ls_ctm_args, energy_setting, global_ar
     x = x0.copy();
 
 
-    iter = 0
+    iter = 1
     gnorm=100;
     E_min=100;
-    while (iter < maxiter) & (gnorm > gtol):
+    delta=ls.delta0;
+    while (iter < ls.maxiter) & (gnorm > ls.gtol) & (delta>1e-6):
         start_time = time.time()
 
         print("optim iteration "+str(iter))
         x.normalize();
-        state_grad,E_grad=get_grad(parameters, x, ls_ctm_args, energy_setting, global_args, config_kwargs);
-        if iter==0:
+        state_grad,E_grad, CTM_cell=get_grad(parameters, x, AD_ctm_args, energy_setting, global_args, config_kwargs);
+        
+        if iter==1:
             E_min=E_grad.item();
-        xgrad_rand=get_random_grad(state_grad,delta)
-        print("norm of random grad:"+str(xgrad_rand.norm()))
-        x_updated=subtract_state(x,xgrad_rand)
+        with torch.no_grad():
+            ls_step=1;
+            E_updated=100;
+            while E_updated>E_min:
+                print('line search step '+str(ls_step))
+                xgrad_rand=get_random_grad(state_grad,delta)
+                print("norm of random grad:"+str(xgrad_rand.norm()))
+                x_updated=subtract_state(x,xgrad_rand)
 
-        E_updated=fx(parameters, x_updated, ls_ctm_args, energy_setting, global_args, config_kwargs);
-        E_updated=E_updated.item();
-        E_min=min(E_min,E_updated)
-        filenm='Z2_D'+str(D)+'_chi'+str(chi);
-        if E_min==E_updated:
-            save_triangle_iPESS(x_updated.B_set, x_updated.T_set, filenm, config_kwargs)
-            end_ = time.time()
-            print('time consumed: '+time.strftime("%H hours, %M minuts, %S seconds", time.gmtime(end_ - start_time)))
-        x=x_updated;
-
-        iter += 1
-        gnorm = state_grad.norm();
+                E_updated=fx(parameters, x_updated, CTM_cell, ls_ctm_args, energy_setting, global_args, config_kwargs);
+                E_updated=E_updated.item();
+                ls_step=ls_step+1;
+                
+                filenm='Z2_D'+str(D)+'_chi'+str(chi);
+                if (E_updated<E_min) :
+                    E_min=E_updated
+                    save_triangle_iPESS(x_updated.B_set, x_updated.T_set, filenm, config_kwargs)
+                    end_ = time.time()
+                    print('time consumed: '+time.strftime("%H hours, %M minuts, %S seconds", time.gmtime(end_ - start_time)))
+                    break;
+                else:
+                    delta=delta*ls.alpha;
+                    print('new delta: '+str(delta))
+            x=x_updated;
+            x.normalize()
+            iter += 1
+            gnorm = state_grad.norm();
     
     return x
 
