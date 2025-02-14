@@ -28,6 +28,7 @@ energy_setting.model = 'spinful_triangle_lattice';
 
 Lx=6;
 Ly=6;
+D=4;
 chi=40;
 
 global_args= GLOBALARGS()
@@ -48,13 +49,13 @@ init=INITCTMARGS()
 
 # config_kwargs = {"backend": "np"}
 #device: 'cpu', 'cuda'
-config_kwargs = {"backend": 'torch', "default_dtype": 'complex128', 'default_device': 'cuda', 'Lx':Lx, 'Ly':Ly}
+config_kwargs = {"backend": 'torch', "default_dtype": 'complex128', 'default_device': 'cpu', 'Lx':Lx, 'Ly':Ly}
 
-filenm='SU_iPESS_Z2_csl_D4'
+filenm='Z2_D4_chi40'
 B_set,T_set=load_triangle_iPESS(filenm,config_kwargs);
 state=IPESS_TRIANGLE(B_set,T_set,config_kwargs)
 state.require_grad(False)
-state.to_device('cuda')
+state.to_device('cpu')
 state.normalize()
 # state.require_grad(True)
 
@@ -133,6 +134,8 @@ def finite_diff(state, ls_ctm_args, energy_setting, global_args, config_kwargs):
         state1.B_set[coord]=bmnew;
         E=cost_fun(state1, ls_ctm_args, energy_setting, global_args, config_kwargs)
         grad_[cc]=grad_[cc]+(E-E0)/delta*1j
+        
+        print(grad_[cc].item())
     print(grad_)
     
 finite_diff(state, ls_ctm_args, energy_setting, global_args, config_kwargs)
@@ -149,9 +152,4 @@ finite_diff(state, ls_ctm_args, energy_setting, global_args, config_kwargs)
 # print(SS_x_set)
 # print(SS_y_set)
 # print(SS_diagonal_set)
-
-
-
-
-        
 

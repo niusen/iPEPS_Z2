@@ -105,6 +105,7 @@ def fx(parameters,state, CTM0, ls_ctm_args, energy_setting, global_args, config_
     init.reconstruct_CTM=False;
     
     CTM_cell, double_B_set,double_T_set,ite_num,ite_err=Fermionic_CTMRG_cell_iPESS(B_set,T_set,init,CTM0, ls_ctm_args, global_args);
+    print('CTM ite_num='+str(ite_num)+', ite_err='+str(ite_err))
 
     E_total,  ex_set, ey_set, e_diagonala_set, e0_set, eU_set=evaluate_ob_cell_iPESS(parameters, B_set,T_set, double_B_set, double_T_set, CTM_cell, energy_setting, config_kwargs, global_args);
     print('E= '+str(E_total.item()))

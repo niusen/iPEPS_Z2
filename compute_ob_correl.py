@@ -78,7 +78,7 @@ with torch.no_grad():
     CTM_cell=None
 
     for chi in chis:
-
+        ls_ctm_args.chi=chi;
         CTM_cell, double_B_set,double_T_set,ite_num,ite_err=Fermionic_CTMRG_cell_iPESS(B_set,T_set,init,CTM_cell, ls_ctm_args, global_args);
 
         E_total,  ex_set, ey_set, e_diagonala_set, e0_set, eU_set=evaluate_ob_cell_iPESS(parameters, B_set,T_set, double_B_set, double_T_set, CTM_cell, energy_setting, config_kwargs, global_args);
