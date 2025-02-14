@@ -54,16 +54,16 @@ config_kwargs = {"backend": 'torch', "default_dtype": 'complex128', 'default_dev
 filenm='Z2_D4_chi40'
 B_set,T_set=load_triangle_iPESS(filenm,config_kwargs);
 state=IPESS_TRIANGLE(B_set,T_set,config_kwargs)
-state.require_grad(False)
+state.requires_grad_(False)
 state.to_device('cpu')
 state.normalize()
 # state.require_grad(True)
 
 # print(B_set.keys())
 # print(T_set.keys())
-B_set=state.B_set
-T_set=state.T_set
-print(B_set['1,1'].requires_grad)
+# B_set=state.B_set
+# T_set=state.T_set
+print(state.requires_grad)
 
 # a,b=yastn.Tensor.compress_to_1d(B_set['1,1'])
 # tnew=yastn.decompress_from_1d(a,b)
@@ -78,14 +78,15 @@ print(B_set['1,1'].requires_grad)
 
 # print()
 def cost_fun(state, ls_ctm_args, energy_setting, global_args, config_kwargs):
-    state.require_grad(True)
-    B_set=state.B_set
-    T_set=state.T_set
+    state.requires_grad_(True)
+    # B_set=state.B_set
+    # T_set=state.T_set
 
     CTM0=None;
-    CTM_cell, double_B_set,double_T_set,ite_num,ite_err=Fermionic_CTMRG_cell_iPESS(B_set,T_set,init,CTM0, ls_ctm_args, global_args);
+    # CTM_cell, double_B_set,double_T_set,ite_num,ite_err=Fermionic_CTMRG_cell_iPESS(state,init,CTM0, ls_ctm_args, global_args);
+    CTM_cell, state_double_layer,ite_num,ite_err=Fermionic_CTMRG_cell_iPESS(state,init,CTM0, ls_ctm_args, global_args);
 
-    E_total,  ex_set, ey_set, e_diagonala_set, e0_set, eU_set=evaluate_ob_cell_iPESS(parameters, B_set,T_set, double_B_set, double_T_set, CTM_cell, energy_setting, config_kwargs, global_args);
+    E_total,  ex_set, ey_set, e_diagonala_set, e0_set, eU_set=evaluate_ob_cell_iPESS(parameters, state, state_double_layer, CTM_cell, energy_setting, config_kwargs, global_args);
     # print(E_total)
     # print(ex_set)
     # print(ey_set)
@@ -138,7 +139,7 @@ def finite_diff(state, ls_ctm_args, energy_setting, global_args, config_kwargs):
         print(grad_[cc].item())
     print(grad_)
     
-finite_diff(state, ls_ctm_args, energy_setting, global_args, config_kwargs)
+# finite_diff(state, ls_ctm_args, energy_setting, global_args, config_kwargs)
 
 # sx_set,sy_set,sz_set=evaluate_spin_cell_iPESS(B_set,T_set, double_B_set, double_T_set, CTM_cell, config_kwargs, global_args);
 # print(sx_set)

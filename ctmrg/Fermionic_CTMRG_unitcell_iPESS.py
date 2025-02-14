@@ -160,7 +160,9 @@ def build_double_layer_swap_Bm(Ap,A, with_physical):
     ##########################
 
 
-def build_doublelayer_swap_iPESS(B_set,T_set, pos):
+def build_doublelayer_swap_iPESS(state, pos):
+    B_set=state.B_set;
+    T_set=state.T_set;
     c1=pos[1-1];
     c2=pos[2-1];
     B=B_set[str(c1)+','+str(c2)];
@@ -169,6 +171,7 @@ def build_doublelayer_swap_iPESS(B_set,T_set, pos):
     T_double = build_double_layer_swap_Bm(T.conj(),T, True);#D R M
     # @tensor AA[:]:=B_double[-1,1,-4]*T_double[-2,-3,1];#(L M U),(D R M) =>(L,D,R,U)
     # AA = yastn.ncon([B_double, T_double], [[-1,1, -4], [-2,-3,1]]);
+    
     return T_double, B_double
 
 
@@ -194,7 +197,7 @@ def rotate_AA_direction(AA_fused,direction):
 
 
 
-def Fermionic_CTMRG_cell_iPESS(B_set,T_set,init,CTM0, ctm_setting,global_args):
+def Fermionic_CTMRG_cell_iPESS(state,init,CTM0, ctm_setting,global_args):
     chi=ctm_setting.chi;
     #Ref: PHYSICAL REVIEW B 98, 235148 (2018)
     ########################
@@ -221,7 +224,7 @@ def Fermionic_CTMRG_cell_iPESS(B_set,T_set,init,CTM0, ctm_setting,global_args):
         # U_U_cell=initial_tuple_cell(Lx,Ly);
         for cx in range(1,Lx+1):
             for cy in range(1,Ly+1):
-                T_double, B_double =build_doublelayer_swap_iPESS(B_set,T_set, (cx,cy));
+                T_double, B_double =build_doublelayer_swap_iPESS(state, (cx,cy));
 
                 double_B_cell[str(cx)+','+str(cy)]= B_double;
                 double_T_cell[str(cx)+','+str(cy)]= T_double;
@@ -229,6 +232,7 @@ def Fermionic_CTMRG_cell_iPESS(B_set,T_set,init,CTM0, ctm_setting,global_args):
                 # U_D_cell=fill_tuple(U_D_cell, U_D_, cx,cy);
                 # U_R_cell=fill_tuple(U_R_cell, U_R_, cx,cy);
                 # U_U_cell=fill_tuple(U_U_cell, U_U_, cx,cy);
+        state_double_layer=IPESS_TRIANGLE(double_B_cell,double_T_cell, state.global_args)
         #     end
         # end
         # AA_memory= (Base.summarysize(double_B_cell)+Base.summarysize(double_T_cell))/1024/1024;
@@ -244,12 +248,13 @@ def Fermionic_CTMRG_cell_iPESS(B_set,T_set,init,CTM0, ctm_setting,global_args):
     # end
 
     if init.reconstruct_CTM:
-        CTM_cell= init_CTM_cell(B_set,T_set,ctm_setting,global_args);
+        CTM_cell= init_CTM_cell(state,ctm_setting,global_args);
     else:
         #copy.deepcopy is not for autograd
         CTM_cell=CTM_copy(CTM0,global_args)
     # end
     
+    B_set=state.B_set;
     ss_old1_cell= torch.ones((Lx,Ly,chi*2),dtype=torch.float64, device=B_set['1,1'].device);
     ss_old2_cell= torch.ones((Lx,Ly,chi*2),dtype=torch.float64, device=B_set['1,1'].device);
     ss_old3_cell= torch.ones((Lx,Ly,chi*2),dtype=torch.float64, device=B_set['1,1'].device);
@@ -341,7 +346,7 @@ def Fermionic_CTMRG_cell_iPESS(B_set,T_set,init,CTM0, ctm_setting,global_args):
             # print(direction)
             #Cset_cell,Tset_cell=CTM_ite_cell(Cset_cell, Tset_cell, double_B_cell,double_T_cell, chi, direction,ctm_setting,global_args);
             # print(Cset_cell['1,1']['C1'].requires_grad)
-            Cset_cell,Tset_cell=checkpoint(CTM_ite_cell, Cset_cell, Tset_cell, double_B_cell,double_T_cell, chi, direction,ctm_setting,global_args, use_reentrant=False)
+            Cset_cell,Tset_cell=checkpoint(CTM_ite_cell, state_double_layer, Cset_cell, Tset_cell, chi, direction,ctm_setting,global_args, use_reentrant=ctm_setting.use_reentrant)
             # print(Cset_cell['1,1']['C1'].requires_grad)
         # end
         
@@ -441,7 +446,7 @@ def Fermionic_CTMRG_cell_iPESS(B_set,T_set,init,CTM0, ctm_setting,global_args):
     CTM_cell=OrderedDict()
     CTM_cell['Cset']=Cset_cell;
     CTM_cell['Tset']=Tset_cell;
-    return CTM_cell, double_B_cell,double_T_cell,ite_num,ite_err
+    return CTM_cell, state_double_layer,ite_num,ite_err
 
 def get_AA_direction(double_B_cell,double_T_cell,direction,pos):
     B_double=double_B_cell[str(pos[1-1])+','+str(pos[2-1])];
@@ -533,11 +538,13 @@ def final_CTM_update(Cset_cell,Tset_cell, M1tem_cell,M5tem_cell,M7tem_cell, coor
     return Cset_cell,Tset_cell
 
 
-def ctm_update_single_cx(cx,cy_max, Cset_cell, Tset_cell, double_B_cell,double_T_cell, chi, direction, ctm_setting, global_args):
+def ctm_update_single_cx(cx,cy_max, Cset_cell, Tset_cell, state_double_layer, chi, direction, ctm_setting, global_args):
     def truncation_f(S):
         return yastn.linalg.truncation_mask_multiplets(S, keep_multiplets=True, D_total=chi, tol=ctm_setting.CTM_trun_tol, tol_block=0.0, eps_multiplet=1.0e-8)
     Lx=global_args.Lx;
     Ly=global_args.Ly;
+    double_B_cell=state_double_layer.B_set;
+    double_T_cell=state_double_layer.T_set;
     PM_cell=initial_cell(Lx,Ly);
     PM_inv_cell=initial_cell(Lx,Ly);
     M1tem_cell=initial_cell(Lx,Ly);
@@ -689,16 +696,19 @@ def ctm_update_single_cx(cx,cy_max, Cset_cell, Tset_cell, double_B_cell,double_T
 
     for cy in range(1,cy_max+1):
         coord=[cx,cy];
-        Cset_cell,Tset_cell=checkpoint(final_CTM_update, Cset_cell,Tset_cell,M1tem_cell,M5tem_cell,M7tem_cell, coord,direction,Lx,Ly, use_reentrant=False)
+        Cset_cell,Tset_cell=final_CTM_update(Cset_cell,Tset_cell, M1tem_cell,M5tem_cell,M7tem_cell, coord,direction,Lx,Ly)
+        # Cset_cell,Tset_cell=checkpoint(final_CTM_update, Cset_cell,Tset_cell, M1tem_cell,M5tem_cell,M7tem_cell, coord,direction,Lx,Ly, use_reentrant=ctm_setting.use_reentrant)
 
 
 
 
     return Cset_cell,Tset_cell
 
-def CTM_ite_cell_continuous_update(Cset_cell, Tset_cell, double_B_cell,double_T_cell, chi, direction, ctm_setting, global_args):
+def CTM_ite_cell_continuous_update(state_double_layer, Cset_cell, Tset_cell, chi, direction, ctm_setting, global_args):
     Lx=global_args.Lx;
     Ly=global_args.Ly;
+    double_B_cell=state_double_layer.B_set;
+    double_T_cell=state_double_layer.T_set;
     #println(direction)    
     #
     """change of coordinate 
@@ -718,8 +728,8 @@ def CTM_ite_cell_continuous_update(Cset_cell, Tset_cell, double_B_cell,double_T_
     cy_max=cx_cy_matrix[direction-1,2-1];
 
     for cx in range(1,cx_max+1):
-        # Cset_cell,Tset_cell=ctm_update_single_cx(cx,cy_max,Cset_cell, Tset_cell, double_B_cell,double_T_cell, chi, direction, ctm_setting, global_args);
-        Cset_cell,Tset_cell=checkpoint(ctm_update_single_cx, cx,cy_max,Cset_cell, Tset_cell, double_B_cell,double_T_cell, chi, direction, ctm_setting, global_args, use_reentrant=False);
+        Cset_cell,Tset_cell=ctm_update_single_cx(cx,cy_max, Cset_cell, Tset_cell, state_double_layer, chi, direction, ctm_setting, global_args);
+        #Cset_cell,Tset_cell=checkpoint(ctm_update_single_cx, cx,cy_max, Cset_cell, Tset_cell, state_double_layer, chi, direction, ctm_setting, global_args, use_reentrant=ctm_setting.use_reentrant);
     return Cset_cell,Tset_cell
 
 
@@ -784,7 +794,7 @@ def init_CTM_swap(T_double, B_double):
     return Cset,Tset
 # end
 
-def init_CTM_cell(B_set,T_set,ls_ctm_args, global_args):
+def init_CTM_cell(state,ls_ctm_args, global_args):
     if ls_ctm_args.CTM_ite_info:
         print("initialize CTM from iPESS")
     
@@ -800,7 +810,7 @@ def init_CTM_cell(B_set,T_set,ls_ctm_args, global_args):
     for cx in range(1,Lx+1):
         for cy in range(1,Ly+1):
             
-            T_double, B_double=build_doublelayer_swap_iPESS(B_set,T_set, [cx,cy]);
+            T_double, B_double=build_doublelayer_swap_iPESS(state, [cx,cy]);
             #AA = yastn.ncon([B_double, T_double], [[-1,1, -4], [-2,-3,1]]);
 
             # CTM_=init_CTM_swap(T_double, B_double);

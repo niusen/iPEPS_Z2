@@ -96,6 +96,16 @@ class CTMARGS():
         self.svd_lanczos_tol = 1e-10
         self.CTM_ite_info = False
         self.construct_double_layer=True;
+        self.use_reentrant=False;
+    
+        #There are currently two checkpointing implementations available, determined
+        #by the :attr:`use_reentrant` parameter. It is recommended that you use
+        #``use_reentrant=False``. Please refer the note below for a discussion of
+        #their differences.
+
+        #The reentrant version does not consider tensors in nested structures
+        #(e.g., custom objects, lists, dicts, etc) as participating in
+        #autograd, while the non-reentrant version does.
 
 
     def __str__(self):

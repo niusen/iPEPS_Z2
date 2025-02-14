@@ -1090,7 +1090,7 @@ def hopping_diagonala_iPESS_no_sign(CTM,O1,O2,string12, B_set,T_set, double_B_se
 
 
 
-def evaluate_ob_cell_iPESS(parameters, B_set,T_set, double_B_set, double_T_set, CTM_cell, energy_setting, config_kwargs, global_args):
+def evaluate_ob_cell_iPESS(parameters, state, state_double_layer, CTM_cell, energy_setting, config_kwargs, global_args):
     """change of coordinate 
     (1,1)  (2,1)
     (1,2)  (2,2)
@@ -1099,6 +1099,10 @@ def evaluate_ob_cell_iPESS(parameters, B_set,T_set, double_B_set, double_T_set, 
     """      
     Lx=global_args.Lx
     Ly=global_args.Ly
+    B_set=state.B_set;
+    T_set=state.T_set;
+    double_B_set=state_double_layer.B_set;
+    double_T_set=state_double_layer.T_set;
     with torch.no_grad(): 
         Ident, N_occu, n_double, Cdag, C, CdagC_string =Hamiltonians_spinful_Z2(config_kwargs);
 

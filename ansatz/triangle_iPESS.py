@@ -13,12 +13,19 @@ class IPESS_TRIANGLE():
         self.global_args=global_args;
         self.Lx=global_args['Lx']
         self.Ly=global_args['Ly']
+
         
-    def require_grad(self,require):
+    @property
+    def requires_grad(self) -> bool:
+        return self.B_set['1,1'].requires_grad
+    
+
+    def requires_grad_(self,require):
         for cx in range(1,self.Lx+1):
             for cy in range(1,self.Ly+1):
                 self.B_set[str(cx)+','+str(cy)].requires_grad_(requires_grad=require)
                 self.T_set[str(cx)+','+str(cy)].requires_grad_(requires_grad=require)
+
 
     def to_device(self,device_):
         for cx in range(1,self.Lx+1):
@@ -56,7 +63,7 @@ class IPESS_TRIANGLE():
         return IPESS_TRIANGLE(B_set_new, T_set_new, self.global_args)
 
             
-            
+
 
 
 def load_triangle_iPESS(filenm,config_kwargs):
