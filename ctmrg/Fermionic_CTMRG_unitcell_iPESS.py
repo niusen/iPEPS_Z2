@@ -533,9 +533,70 @@ def final_CTM_update(Cset_cell,Tset_cell, M1tem_cell,M5tem_cell,M7tem_cell, coor
     return Cset_cell,Tset_cell
 
 
-def ctm_update_single_cx(cx,cy_max, Cset_cell, Tset_cell, double_B_cell,double_T_cell, chi, direction, ctm_setting, global_args):
+
+def ctm_svd_segment(MMup, MMup_reflect,MMlow, MMlow_reflect,chi,ctm_setting):
     def truncation_f(S):
         return yastn.linalg.truncation_mask_multiplets(S, keep_multiplets=True, D_total=chi, tol=ctm_setting.CTM_trun_tol, tol_block=0.0, eps_multiplet=1.0e-8)
+    # RMup=permute(MMup*MMup_reflect,(3,4,),(1,2,));
+    RMup = yastn.ncon([MMup, MMup_reflect], [[-3,-4,1,2], [1,2,-1,-2]]);
+
+    # RMlow=MMlow*MMlow_reflect;
+    RMlow = yastn.ncon([MMlow, MMlow_reflect], [[-1,-2,1,2], [1,2,-3,-4]]);
+
+    RMlow_norm=yastn.linalg.norm(RMlow);
+    RMlow= RMlow/RMlow_norm;
+    RMup_norm=yastn.linalg.norm(RMup);
+    RMup= RMup/RMup_norm;
+
+    # M=RMup*RMlow;
+    M = yastn.ncon([RMup, RMlow], [[-1,-2,1,2], [1,2,-3,-4]]);
+
+
+    #####################################
+
+
+    # uM,sM,vM = my_tsvd(M; trunc=truncdim(chi+chi_extra));
+    chi_extra=3;
+    M=M/(yastn.linalg.norm(M))
+
+
+    # uM,sM,vM = yastn.linalg.svd_with_truncation(M, axes=((0, 1), (2, 3)), D_total=chi+chi_extra,svd_on_cpu=True, truncate_multiplets=True, tol=ctm_setting.CTM_trun_tol);
+    uM,sM,vM = yastn.linalg.svd_with_truncation(M, axes=((0, 1), (2, 3)), D_total=chi+chi_extra, svd_on_cpu=True, tol=ctm_setting.CTM_trun_tol, mask_f=truncation_f);
+
+    # Legs=M.get_legs();
+    # config_kwargs = {"backend": "torch", "default_dtype": 'complex128', 'default_device': 'cuda', 'Lx':6, 'Ly':6}
+    # config_Z2 = yastn.make_config(sym='Z2',fermionic=True, **config_kwargs)
+    # CdagC_string = yastn.eye(config=config_Z2,legs=Legs[2], isdiag=False)
+    #sM_1d,bb=yastn.Tensor.compress_to_1d(sM);
+    #print(sM_1d)
+
+    #############################################
+
+
+
+    sM_norm=yastn.linalg.norm(sM);
+    sM=sM/sM_norm;
+    
+    #sM_inv_sqrt=sdiag_inv_sqrt(sM);
+    # sM_inv_sqrt=sM.rsqrt(cutoff=1e-10);
+    sM_inv_sqrt=sM.rsqrt(cutoff=ctm_setting.CTM_trun_tol);
+    # sM_inv_sqrt=sM_inv_sqrt.rsqrt(cutoff=1e-10);
+    #sM_inv_sqrt_1d,bb=yastn.Tensor.compress_to_1d(sM_inv_sqrt);
+    #print(sM_inv_sqrt_1d)
+
+    # PM_inv=RMlow*vM'*sM_inv_sqrt;
+    vMp=vM.conj();
+    PM_inv = yastn.ncon([RMlow, vMp, sM_inv_sqrt], [[-1,-2,1,2], [3,1,2], [3,-3]]);
+
+    
+    # PM=sM_inv_sqrt*uM'*RMup;
+    #PM=permute(PM,(2,3,),(1,));
+    uMp=uM.conj();
+    PM = yastn.ncon([sM_inv_sqrt, uMp, RMup], [[-3,3], [1,2,3], [1,2,-1,-2]]);
+    return PM, PM_inv 
+
+def ctm_update_single_cx(cx,cy_max, Cset_cell, Tset_cell, double_B_cell,double_T_cell, chi, direction, ctm_setting, global_args):
+
     Lx=global_args.Lx;
     Ly=global_args.Ly;
     PM_cell=initial_cell(Lx,Ly);
@@ -546,16 +607,22 @@ def ctm_update_single_cx(cx,cy_max, Cset_cell, Tset_cell, double_B_cell,double_T
 
     for cy in range(1,cy_max+1):
         coord=[cx,cy];
+        print(coord)
 
         ##########################
 
-        MMup=build_corner_MMup(coord,direction,double_B_cell,double_T_cell,Cset_cell,Tset_cell,Lx,Ly);
+        # MMup=build_corner_MMup(coord,direction,double_B_cell,double_T_cell,Cset_cell,Tset_cell,Lx,Ly);
 
-        MMlow=build_corner_MMlow(coord,direction,double_B_cell,double_T_cell,Cset_cell,Tset_cell,Lx,Ly);
+        # MMlow=build_corner_MMlow(coord,direction,double_B_cell,double_T_cell,Cset_cell,Tset_cell,Lx,Ly);
 
-        MMup_reflect=build_corner_MMup_reflect(coord,direction,double_B_cell,double_T_cell,Cset_cell,Tset_cell,Lx,Ly);
+        # MMup_reflect=build_corner_MMup_reflect(coord,direction,double_B_cell,double_T_cell,Cset_cell,Tset_cell,Lx,Ly);
 
-        MMlow_reflect=build_corner_MMlow_reflect(coord,direction,double_B_cell,double_T_cell,Cset_cell,Tset_cell,Lx,Ly);
+        # MMlow_reflect=build_corner_MMlow_reflect(coord,direction,double_B_cell,double_T_cell,Cset_cell,Tset_cell,Lx,Ly);
+
+        MMup=checkpoint(build_corner_MMup, coord,direction,double_B_cell,double_T_cell,Cset_cell,Tset_cell,Lx,Ly, use_reentrant=False);
+        MMlow=checkpoint(build_corner_MMlow, coord,direction,double_B_cell,double_T_cell,Cset_cell,Tset_cell,Lx,Ly, use_reentrant=False);
+        MMup_reflect=checkpoint(build_corner_MMup_reflect, coord,direction,double_B_cell,double_T_cell,Cset_cell,Tset_cell,Lx,Ly, use_reentrant=False);
+        MMlow_reflect=checkpoint(build_corner_MMlow_reflect, coord,direction,double_B_cell,double_T_cell,Cset_cell,Tset_cell,Lx,Ly, use_reentrant=False);
 
         ############################
 
@@ -573,64 +640,8 @@ def ctm_update_single_cx(cx,cy_max, Cset_cell, Tset_cell, double_B_cell,double_T
         # MMlow_reflect=permute(MMlow_reflect,(1,2,),(3,4,))
         #MMlow_reflect=yastn.transpose(MMlow_reflect, axes=(0,1,2,3))
 
-        
+        PM, PM_inv =checkpoint(ctm_svd_segment,MMup, MMup_reflect,MMlow, MMlow_reflect,chi,ctm_setting, use_reentrant=False)
 
-        # RMup=permute(MMup*MMup_reflect,(3,4,),(1,2,));
-        RMup = yastn.ncon([MMup, MMup_reflect], [[-3,-4,1,2], [1,2,-1,-2]]);
-
-        # RMlow=MMlow*MMlow_reflect;
-        RMlow = yastn.ncon([MMlow, MMlow_reflect], [[-1,-2,1,2], [1,2,-3,-4]]);
-
-        RMlow_norm=yastn.linalg.norm(RMlow);
-        RMlow= RMlow/RMlow_norm;
-        RMup_norm=yastn.linalg.norm(RMup);
-        RMup= RMup/RMup_norm;
-
-        # M=RMup*RMlow;
-        M = yastn.ncon([RMup, RMlow], [[-1,-2,1,2], [1,2,-3,-4]]);
-
-
-        #####################################
-
-
-        # uM,sM,vM = my_tsvd(M; trunc=truncdim(chi+chi_extra));
-        chi_extra=3;
-        M=M/(yastn.linalg.norm(M))
-
-
-        # uM,sM,vM = yastn.linalg.svd_with_truncation(M, axes=((0, 1), (2, 3)), D_total=chi+chi_extra,svd_on_cpu=True, truncate_multiplets=True, tol=ctm_setting.CTM_trun_tol);
-        uM,sM,vM = yastn.linalg.svd_with_truncation(M, axes=((0, 1), (2, 3)), D_total=chi+chi_extra, svd_on_cpu=True, tol=ctm_setting.CTM_trun_tol, mask_f=truncation_f);
-
-        # Legs=M.get_legs();
-        # config_kwargs = {"backend": "torch", "default_dtype": 'complex128', 'default_device': 'cuda', 'Lx':6, 'Ly':6}
-        # config_Z2 = yastn.make_config(sym='Z2',fermionic=True, **config_kwargs)
-        # CdagC_string = yastn.eye(config=config_Z2,legs=Legs[2], isdiag=False)
-        #sM_1d,bb=yastn.Tensor.compress_to_1d(sM);
-        #print(sM_1d)
-
-        #############################################
-    
-
-
-        sM_norm=yastn.linalg.norm(sM);
-        sM=sM/sM_norm;
-        
-        #sM_inv_sqrt=sdiag_inv_sqrt(sM);
-        # sM_inv_sqrt=sM.rsqrt(cutoff=1e-10);
-        sM_inv_sqrt=sM.rsqrt(cutoff=ctm_setting.CTM_trun_tol);
-        # sM_inv_sqrt=sM_inv_sqrt.rsqrt(cutoff=1e-10);
-        #sM_inv_sqrt_1d,bb=yastn.Tensor.compress_to_1d(sM_inv_sqrt);
-        #print(sM_inv_sqrt_1d)
-
-        # PM_inv=RMlow*vM'*sM_inv_sqrt;
-        vMp=vM.conj();
-        PM_inv = yastn.ncon([RMlow, vMp, sM_inv_sqrt], [[-1,-2,1,2], [3,1,2], [3,-3]]);
-
-        
-        # PM=sM_inv_sqrt*uM'*RMup;
-        #PM=permute(PM,(2,3,),(1,));
-        uMp=uM.conj();
-        PM = yastn.ncon([sM_inv_sqrt, uMp, RMup], [[-3,3], [1,2,3], [1,2,-1,-2]]);
         
 
         Pos=convert_cell_posit(coord[1-1],coord[2-1],0,2,direction, Lx,Ly);
