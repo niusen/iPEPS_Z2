@@ -231,6 +231,23 @@ def CTM_to_device(CTM_set,Device,global_args):
             CTM_set['Tset'][str(cx)+','+str(cy)]['T4']=CTM_set['Tset'][str(cx)+','+str(cy)]['T4'].to(Device)
     return CTM_set
 
+def Cset_to_device(Cset, Device,global_args):
+    for cx in range(1,global_args.Lx+1):
+        for cy in range(1,global_args.Ly+1):
+            Cset[str(cx)+','+str(cy)]['C1']=Cset[str(cx)+','+str(cy)]['C1'].to(Device)
+            Cset[str(cx)+','+str(cy)]['C2']=Cset[str(cx)+','+str(cy)]['C2'].to(Device)
+            Cset[str(cx)+','+str(cy)]['C3']=Cset[str(cx)+','+str(cy)]['C3'].to(Device)
+            Cset[str(cx)+','+str(cy)]['C4']=Cset[str(cx)+','+str(cy)]['C4'].to(Device)
+    return Cset
+def Tset_to_device(Tset, Device,global_args):
+    for cx in range(1,global_args.Lx+1):
+        for cy in range(1,global_args.Ly+1):
+            Tset[str(cx)+','+str(cy)]['T1']=Tset[str(cx)+','+str(cy)]['T1'].to(Device)
+            Tset[str(cx)+','+str(cy)]['T2']=Tset[str(cx)+','+str(cy)]['T2'].to(Device)
+            Tset[str(cx)+','+str(cy)]['T3']=Tset[str(cx)+','+str(cy)]['T3'].to(Device)
+            Tset[str(cx)+','+str(cy)]['T4']=Tset[str(cx)+','+str(cy)]['T4'].to(Device)
+    return Tset
+
 def CTM_detach(CTM_set,global_args):
     for cx in range(1,global_args.Lx+1):
         for cy in range(1,global_args.Ly+1):

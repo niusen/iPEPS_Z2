@@ -332,7 +332,7 @@ def Fermionic_CTMRG_cell_iPESS(state,init,CTM0, ctm_setting,global_args):
     err_set=(1,);#tuple
     
 
-    CTM_ite_cell=CTM_ite_cell_continuous_update;
+
     
 
     for ci in range(1,CTM_ite_nums+1):
@@ -344,9 +344,19 @@ def Fermionic_CTMRG_cell_iPESS(state,init,CTM0, ctm_setting,global_args):
         
         for direction in direction_order:
             # print(direction)
-            #Cset_cell,Tset_cell=CTM_ite_cell(Cset_cell, Tset_cell, double_B_cell,double_T_cell, chi, direction,ctm_setting,global_args);
+            #Cset_cell,Tset_cell=CTM_ite_cell_continuous_update(Cset_cell, Tset_cell, double_B_cell,double_T_cell, chi, direction,ctm_setting,global_args);
             # print(Cset_cell['1,1']['C1'].requires_grad)
-            Cset_cell,Tset_cell=checkpoint(CTM_ite_cell, state_double_layer, Cset_cell, Tset_cell, chi, direction,ctm_setting,global_args, use_reentrant=ctm_setting.use_reentrant)
+            
+            if ctm_setting.use_checkpoint:
+                if ctm_setting.checkpoint_device !=global_args.device:
+                    Cset_cell=Cset_to_device(Cset_cell, ctm_setting.checkpoint_device,global_args);
+                    Tset_cell=Tset_to_device(Tset_cell, ctm_setting.checkpoint_device,global_args);
+                Cset_cell,Tset_cell=checkpoint(CTM_ite_cell_continuous_update, state_double_layer, Cset_cell, Tset_cell, chi, direction,ctm_setting,global_args, use_reentrant=ctm_setting.use_reentrant);
+                if ctm_setting.checkpoint_device !=global_args.device:
+                    Cset_cell=Cset_to_device(Cset_cell, global_args.device,global_args);
+                    Tset_cell=Tset_to_device(Tset_cell, global_args.device,global_args);
+            else:
+                Cset_cell,Tset_cell=CTM_ite_cell_continuous_update(state_double_layer, Cset_cell, Tset_cell, chi, direction,ctm_setting,global_args);
             # print(Cset_cell['1,1']['C1'].requires_grad)
         # end
         
@@ -521,6 +531,7 @@ def build_corner_MMlow_reflect(coord_,direction_,double_B_cell_,double_T_cell_,C
 
 
 def final_CTM_update(Cset_cell,Tset_cell, M1tem_cell,M5tem_cell,M7tem_cell, coord,direction,Lx,Ly):
+    
     Pos=convert_cell_posit(coord[1-1],coord[2-1],1,0,direction, Lx,Ly);
     # Cset_cell[str(Pos[1-1])+','+str(Pos[2-1])]['C'+str(mod1(direction,4))]=M1tem_cell[str(Pos[1-1])+','+str(Pos[2-1])];
     Cset_new=update_CTM_C(Cset_cell[str(Pos[1-1])+','+str(Pos[2-1])],M1tem_cell[str(Pos[1-1])+','+str(Pos[2-1])],mod1(direction,4))
@@ -539,6 +550,7 @@ def final_CTM_update(Cset_cell,Tset_cell, M1tem_cell,M5tem_cell,M7tem_cell, coor
 
 
 def ctm_update_single_cx(cx,cy_max, Cset_cell, Tset_cell, state_double_layer, chi, direction, ctm_setting, global_args):
+
     def truncation_f(S):
         return yastn.linalg.truncation_mask_multiplets(S, keep_multiplets=True, D_total=chi, tol=ctm_setting.CTM_trun_tol, tol_block=0.0, eps_multiplet=1.0e-8)
     Lx=global_args.Lx;
@@ -696,8 +708,11 @@ def ctm_update_single_cx(cx,cy_max, Cset_cell, Tset_cell, state_double_layer, ch
 
     for cy in range(1,cy_max+1):
         coord=[cx,cy];
-        Cset_cell,Tset_cell=final_CTM_update(Cset_cell,Tset_cell, M1tem_cell,M5tem_cell,M7tem_cell, coord,direction,Lx,Ly)
-        # Cset_cell,Tset_cell=checkpoint(final_CTM_update, Cset_cell,Tset_cell, M1tem_cell,M5tem_cell,M7tem_cell, coord,direction,Lx,Ly, use_reentrant=ctm_setting.use_reentrant)
+        if ctm_setting.use_checkpoint:
+            Cset_cell,Tset_cell=checkpoint(final_CTM_update, Cset_cell,Tset_cell, M1tem_cell,M5tem_cell,M7tem_cell, coord,direction,Lx,Ly, use_reentrant=ctm_setting.use_reentrant);
+        else:
+            Cset_cell,Tset_cell=final_CTM_update(Cset_cell,Tset_cell, M1tem_cell,M5tem_cell,M7tem_cell, coord,direction,Lx,Ly);
+    
 
 
 
@@ -705,10 +720,14 @@ def ctm_update_single_cx(cx,cy_max, Cset_cell, Tset_cell, state_double_layer, ch
     return Cset_cell,Tset_cell
 
 def CTM_ite_cell_continuous_update(state_double_layer, Cset_cell, Tset_cell, chi, direction, ctm_setting, global_args):
+
+    if ctm_setting.checkpoint_device !=global_args.device:
+        Cset_cell=Cset_to_device(Cset_cell, global_args.device,global_args);
+        Tset_cell=Tset_to_device(Tset_cell, global_args.device,global_args);
     Lx=global_args.Lx;
     Ly=global_args.Ly;
-    double_B_cell=state_double_layer.B_set;
-    double_T_cell=state_double_layer.T_set;
+    # double_B_cell=state_double_layer.B_set;
+    # double_T_cell=state_double_layer.T_set;
     #println(direction)    
     #
     """change of coordinate 
@@ -728,8 +747,15 @@ def CTM_ite_cell_continuous_update(state_double_layer, Cset_cell, Tset_cell, chi
     cy_max=cx_cy_matrix[direction-1,2-1];
 
     for cx in range(1,cx_max+1):
-        Cset_cell,Tset_cell=ctm_update_single_cx(cx,cy_max, Cset_cell, Tset_cell, state_double_layer, chi, direction, ctm_setting, global_args);
-        #Cset_cell,Tset_cell=checkpoint(ctm_update_single_cx, cx,cy_max, Cset_cell, Tset_cell, state_double_layer, chi, direction, ctm_setting, global_args, use_reentrant=ctm_setting.use_reentrant);
+        if ctm_setting.use_checkpoint:
+            Cset_cell,Tset_cell=checkpoint(ctm_update_single_cx, cx,cy_max, Cset_cell, Tset_cell, state_double_layer, chi, direction, ctm_setting, global_args, use_reentrant=ctm_setting.use_reentrant);
+        else:
+            Cset_cell,Tset_cell=ctm_update_single_cx(cx,cy_max, Cset_cell, Tset_cell, state_double_layer, chi, direction, ctm_setting, global_args);
+    
+    if ctm_setting.checkpoint_device !=global_args.device:
+        Cset_cell=Cset_to_device(Cset_cell, ctm_setting.checkpoint_device,global_args);
+        Tset_cell=Tset_to_device(Tset_cell, ctm_setting.checkpoint_device,global_args);
+
     return Cset_cell,Tset_cell
 
 

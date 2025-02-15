@@ -97,6 +97,8 @@ class CTMARGS():
         self.CTM_ite_info = False
         self.construct_double_layer=True;
         self.use_reentrant=False;
+        self.use_checkpoint=True;
+        self.checkpoint_device='cpu';
     
         #There are currently two checkpointing implementations available, determined
         #by the :attr:`use_reentrant` parameter. It is recommended that you use

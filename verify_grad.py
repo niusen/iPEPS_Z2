@@ -12,8 +12,13 @@ from ansatz.triangle_iPESS import *
 from ctmrg.Fermionic_CTMRG_unitcell_iPESS import *
 from model.fermion_ob_iPESS import *
 
+#############################
+#memory_limit = 15;#GB
+#print('restricted memory:'+str(memory_limit)+'GB')
+#resource.setrlimit(resource.RLIMIT_AS, (memory_limit*1024 * 1024 * 1024, memory_limit*1024 * 1024 * 1024))
 n_cpu=10;
 torch.set_num_threads(n_cpu)
+#############################
 
 t1=1;
 t2=1;
@@ -31,15 +36,15 @@ Ly=6;
 D=4;
 chi=40;
 
-global_args= GLOBALARGS()
-global_args.Lx=Lx;
-global_args.Ly=Ly;
+
 
 ls_ctm_args= CTMARGS()
 ls_ctm_args.CTM_ite_info=True
 ls_ctm_args.chi=chi;
 ls_ctm_args.CTM_ite_nums=1;
 ls_ctm_args.CTM_trun_tol=1e-8
+ls_ctm_args.use_checkpoint=True;
+ls_ctm_args.checkpoint_device='cpu';
 print(ls_ctm_args, flush=True)
 
 opt_args= OPTARGS()
@@ -49,13 +54,18 @@ init=INITCTMARGS()
 
 # config_kwargs = {"backend": "np"}
 #device: 'cpu', 'cuda'
-config_kwargs = {"backend": 'torch', "default_dtype": 'complex128', 'default_device': 'cpu', 'Lx':Lx, 'Ly':Ly}
+config_kwargs = {"backend": 'torch', "default_dtype": 'complex128', 'default_device': 'cuda', 'Lx':Lx, 'Ly':Ly}
+
+global_args= GLOBALARGS()
+global_args.Lx=Lx;
+global_args.Ly=Ly;
+global_args.device=config_kwargs['default_device'];
 
 filenm='Z2_D4_chi40'
 B_set,T_set=load_triangle_iPESS(filenm,config_kwargs);
 state=IPESS_TRIANGLE(B_set,T_set,config_kwargs)
 state.requires_grad_(False)
-state.to_device('cpu')
+state.to_device(config_kwargs['default_device'])
 state.normalize()
 # state.require_grad(True)
 
