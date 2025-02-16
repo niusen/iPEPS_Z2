@@ -645,7 +645,12 @@ def get_M(coord,direction,double_B_cell,double_T_cell,Cset_cell,Tset_cell, ctm_s
 
     # M=RMup*RMlow;
     M = yastn.ncon([RMup, RMlow], [[-1,-2,1,2], [1,2,-3,-4]]);
-    return M,RMup,RMlow
+    M=M/(yastn.linalg.norm(M));
+
+    if ctm_setting.doublelayer_on_cpu:
+        return M.to('cpu'),RMup.to('cpu'),RMlow.to('cpu')
+    else:
+        return M,RMup,RMlow
 
 
 
@@ -759,17 +764,22 @@ def ctm_update_single_cx(cx,cy_max, Cset_cell, Tset_cell, double_B_cell,double_T
 
         #####################################
         M,RMup,RMlow=checkpoint(get_M, coord,direction,double_B_cell,double_T_cell,Cset_cell,Tset_cell, ctm_setting, global_args, use_reentrant=False);
+        #print(M.device)
         #####################################
 
 
         # uM,sM,vM = my_tsvd(M; trunc=truncdim(chi+chi_extra));
         chi_extra=3;
-        M=M/(yastn.linalg.norm(M))
+        
 
 
         # uM,sM,vM = yastn.linalg.svd_with_truncation(M, axes=((0, 1), (2, 3)), D_total=chi+chi_extra,svd_on_cpu=True, truncate_multiplets=True, tol=ctm_setting.CTM_trun_tol);
         uM,sM,vM = yastn.linalg.svd_with_truncation(M, axes=((0, 1), (2, 3)), D_total=chi+chi_extra, svd_on_cpu=True, tol=ctm_setting.CTM_trun_tol, mask_f=truncation_f);
-
+        if ctm_setting.doublelayer_on_cpu:#send back to gpu 
+            uM=uM.to(global_args.device);
+            sM=sM.to(global_args.device);
+            vM=vM.to(global_args.device);
+        
         # Legs=M.get_legs();
         # config_kwargs = {"backend": "torch", "default_dtype": 'complex128', 'default_device': 'cuda', 'Lx':6, 'Ly':6}
         # config_Z2 = yastn.make_config(sym='Z2',fermionic=True, **config_kwargs)
@@ -793,13 +803,19 @@ def ctm_update_single_cx(cx,cy_max, Cset_cell, Tset_cell, double_B_cell,double_T
 
         # PM_inv=RMlow*vM'*sM_inv_sqrt;
         vMp=vM.conj();
-        PM_inv = yastn.ncon([RMlow, vMp, sM_inv_sqrt], [[-1,-2,1,2], [3,1,2], [3,-3]]);
+        if ctm_setting.doublelayer_on_cpu:#send back to gpu 
+            PM_inv = yastn.ncon([RMlow.to(global_args.device), vMp, sM_inv_sqrt], [[-1,-2,1,2], [3,1,2], [3,-3]]);
+        else:
+            PM_inv = yastn.ncon([RMlow, vMp, sM_inv_sqrt], [[-1,-2,1,2], [3,1,2], [3,-3]]);
 
         
         # PM=sM_inv_sqrt*uM'*RMup;
         #PM=permute(PM,(2,3,),(1,));
         uMp=uM.conj();
-        PM = yastn.ncon([sM_inv_sqrt, uMp, RMup], [[-3,3], [1,2,3], [1,2,-1,-2]]);
+        if ctm_setting.doublelayer_on_cpu:#send back to gpu 
+            PM = yastn.ncon([sM_inv_sqrt, uMp, RMup.to(global_args.device)], [[-3,3], [1,2,3], [1,2,-1,-2]]);
+        else:
+            PM = yastn.ncon([sM_inv_sqrt, uMp, RMup], [[-3,3], [1,2,3], [1,2,-1,-2]]);
 
         
 
