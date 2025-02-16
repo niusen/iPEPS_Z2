@@ -595,6 +595,47 @@ def final_CTM_update(Cset_cell,Tset_cell, M1tem_cell,M5tem_cell,M7tem_cell, coor
 #     PM = yastn.ncon([sM_inv_sqrt, uMp, RMup], [[-3,3], [1,2,3], [1,2,-1,-2]]);
 #     return PM, PM_inv 
 
+
+def get_M(coord,direction,double_B_cell,double_T_cell,Cset_cell,Tset_cell,Lx,Ly):
+    MMup=build_corner_MMup(coord,direction,double_B_cell,double_T_cell,Cset_cell,Tset_cell,Lx,Ly);
+    MMlow=build_corner_MMlow(coord,direction,double_B_cell,double_T_cell,Cset_cell,Tset_cell,Lx,Ly);
+    MMup_reflect=build_corner_MMup_reflect(coord,direction,double_B_cell,double_T_cell,Cset_cell,Tset_cell,Lx,Ly);
+    MMlow_reflect=build_corner_MMlow_reflect(coord,direction,double_B_cell,double_T_cell,Cset_cell,Tset_cell,Lx,Ly);
+
+    ############################
+
+
+
+    #MMup=permute(MMup,(1,2,),(3,4,))
+    #MMup=yastn.transpose(MMup, axes=(0,1,2,3))
+
+    # MMlow=permute(MMlow,(1,2,),(3,4,))
+    #MMlow=yastn.transpose(MMlow, axes=(0,1,2,3))
+
+    # MMup_reflect=permute(MMup_reflect,(1,2,),(3,4,))
+    #MMup_reflect=yastn.transpose(MMup_reflect, axes=(0,1,2,3))
+
+    # MMlow_reflect=permute(MMlow_reflect,(1,2,),(3,4,))
+    #MMlow_reflect=yastn.transpose(MMlow_reflect, axes=(0,1,2,3))
+
+    #PM, PM_inv =checkpoint(ctm_svd_segment,MMup, MMup_reflect,MMlow, MMlow_reflect,chi,ctm_setting, use_reentrant=False)
+
+
+    # RMup=permute(MMup*MMup_reflect,(3,4,),(1,2,));
+    RMup = yastn.ncon([MMup, MMup_reflect], [[-3,-4,1,2], [1,2,-1,-2]]);
+
+    # RMlow=MMlow*MMlow_reflect;
+    RMlow = yastn.ncon([MMlow, MMlow_reflect], [[-1,-2,1,2], [1,2,-3,-4]]);
+
+    RMlow_norm=yastn.linalg.norm(RMlow);
+    RMlow= RMlow/RMlow_norm;
+    RMup_norm=yastn.linalg.norm(RMup);
+    RMup= RMup/RMup_norm;
+
+    # M=RMup*RMlow;
+    M = yastn.ncon([RMup, RMlow], [[-1,-2,1,2], [1,2,-3,-4]]);
+    return M,RMup,RMlow
+
 def ctm_update_single_cx(cx,cy_max, Cset_cell, Tset_cell, double_B_cell,double_T_cell, chi, direction, ctm_setting, global_args):
     def truncation_f(S):
         return yastn.linalg.truncation_mask_multiplets(S, keep_multiplets=True, D_total=chi, tol=ctm_setting.CTM_trun_tol, tol_block=0.0, eps_multiplet=1.0e-8)
@@ -620,45 +661,46 @@ def ctm_update_single_cx(cx,cy_max, Cset_cell, Tset_cell, double_B_cell,double_T
 
         # MMlow_reflect=build_corner_MMlow_reflect(coord,direction,double_B_cell,double_T_cell,Cset_cell,Tset_cell,Lx,Ly);
 
-        MMup=checkpoint(build_corner_MMup, coord,direction,double_B_cell,double_T_cell,Cset_cell,Tset_cell,Lx,Ly, use_reentrant=False);
-        MMlow=checkpoint(build_corner_MMlow, coord,direction,double_B_cell,double_T_cell,Cset_cell,Tset_cell,Lx,Ly, use_reentrant=False);
-        MMup_reflect=checkpoint(build_corner_MMup_reflect, coord,direction,double_B_cell,double_T_cell,Cset_cell,Tset_cell,Lx,Ly, use_reentrant=False);
-        MMlow_reflect=checkpoint(build_corner_MMlow_reflect, coord,direction,double_B_cell,double_T_cell,Cset_cell,Tset_cell,Lx,Ly, use_reentrant=False);
+        # MMup=checkpoint(build_corner_MMup, coord,direction,double_B_cell,double_T_cell,Cset_cell,Tset_cell,Lx,Ly, use_reentrant=False);
+        # MMlow=checkpoint(build_corner_MMlow, coord,direction,double_B_cell,double_T_cell,Cset_cell,Tset_cell,Lx,Ly, use_reentrant=False);
+        # MMup_reflect=checkpoint(build_corner_MMup_reflect, coord,direction,double_B_cell,double_T_cell,Cset_cell,Tset_cell,Lx,Ly, use_reentrant=False);
+        # MMlow_reflect=checkpoint(build_corner_MMlow_reflect, coord,direction,double_B_cell,double_T_cell,Cset_cell,Tset_cell,Lx,Ly, use_reentrant=False);
 
-        ############################
-
-
-
-        #MMup=permute(MMup,(1,2,),(3,4,))
-        #MMup=yastn.transpose(MMup, axes=(0,1,2,3))
-
-        # MMlow=permute(MMlow,(1,2,),(3,4,))
-        #MMlow=yastn.transpose(MMlow, axes=(0,1,2,3))
-
-        # MMup_reflect=permute(MMup_reflect,(1,2,),(3,4,))
-        #MMup_reflect=yastn.transpose(MMup_reflect, axes=(0,1,2,3))
-
-        # MMlow_reflect=permute(MMlow_reflect,(1,2,),(3,4,))
-        #MMlow_reflect=yastn.transpose(MMlow_reflect, axes=(0,1,2,3))
-
-        #PM, PM_inv =checkpoint(ctm_svd_segment,MMup, MMup_reflect,MMlow, MMlow_reflect,chi,ctm_setting, use_reentrant=False)
+        # ############################
 
 
-        # RMup=permute(MMup*MMup_reflect,(3,4,),(1,2,));
-        RMup = yastn.ncon([MMup, MMup_reflect], [[-3,-4,1,2], [1,2,-1,-2]]);
 
-        # RMlow=MMlow*MMlow_reflect;
-        RMlow = yastn.ncon([MMlow, MMlow_reflect], [[-1,-2,1,2], [1,2,-3,-4]]);
+        # #MMup=permute(MMup,(1,2,),(3,4,))
+        # #MMup=yastn.transpose(MMup, axes=(0,1,2,3))
 
-        RMlow_norm=yastn.linalg.norm(RMlow);
-        RMlow= RMlow/RMlow_norm;
-        RMup_norm=yastn.linalg.norm(RMup);
-        RMup= RMup/RMup_norm;
+        # # MMlow=permute(MMlow,(1,2,),(3,4,))
+        # #MMlow=yastn.transpose(MMlow, axes=(0,1,2,3))
 
-        # M=RMup*RMlow;
-        M = yastn.ncon([RMup, RMlow], [[-1,-2,1,2], [1,2,-3,-4]]);
+        # # MMup_reflect=permute(MMup_reflect,(1,2,),(3,4,))
+        # #MMup_reflect=yastn.transpose(MMup_reflect, axes=(0,1,2,3))
+
+        # # MMlow_reflect=permute(MMlow_reflect,(1,2,),(3,4,))
+        # #MMlow_reflect=yastn.transpose(MMlow_reflect, axes=(0,1,2,3))
+
+        # #PM, PM_inv =checkpoint(ctm_svd_segment,MMup, MMup_reflect,MMlow, MMlow_reflect,chi,ctm_setting, use_reentrant=False)
 
 
+        # # RMup=permute(MMup*MMup_reflect,(3,4,),(1,2,));
+        # RMup = yastn.ncon([MMup, MMup_reflect], [[-3,-4,1,2], [1,2,-1,-2]]);
+
+        # # RMlow=MMlow*MMlow_reflect;
+        # RMlow = yastn.ncon([MMlow, MMlow_reflect], [[-1,-2,1,2], [1,2,-3,-4]]);
+
+        # RMlow_norm=yastn.linalg.norm(RMlow);
+        # RMlow= RMlow/RMlow_norm;
+        # RMup_norm=yastn.linalg.norm(RMup);
+        # RMup= RMup/RMup_norm;
+
+        # # M=RMup*RMlow;
+        # M = yastn.ncon([RMup, RMlow], [[-1,-2,1,2], [1,2,-3,-4]]);
+
+        #####################################
+        M,RMup,RMlow=checkpoint(get_M, coord,direction,double_B_cell,double_T_cell,Cset_cell,Tset_cell,Lx,Ly, use_reentrant=False);
         #####################################
 
 

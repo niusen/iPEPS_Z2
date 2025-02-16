@@ -1,4 +1,6 @@
 import os
+# os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"  # Must be set BEFORE importing torch
+# print("PYTORCH_CUDA_ALLOC_CONF:", os.environ.get("PYTORCH_CUDA_ALLOC_CONF"))
 import sys
 sys.path.append('D:/My Documents/Code/python_codes/iPEPS_Z2')
 from collections import OrderedDict
