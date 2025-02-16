@@ -264,8 +264,10 @@ def Cell_to_device(A_set,Device,global_args):
     for cx in range(1,global_args.Lx+1):
         for cy in range(1,global_args.Ly+1):
             A_set[str(cx)+','+str(cy)]=A_set[str(cx)+','+str(cy)].to(Device)
+    return A_set
 
-def Cell_detach(A_set,Device,global_args):
+def Cell_detach(A_set,global_args):
     for cx in range(1,global_args.Lx+1):
         for cy in range(1,global_args.Ly+1):
             A_set[str(cx)+','+str(cy)]=A_set[str(cx)+','+str(cy)].detach()
+    return A_set
