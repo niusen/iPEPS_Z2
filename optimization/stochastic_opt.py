@@ -57,7 +57,9 @@ def cost_fun(parameters,state, ctm_args, energy_setting, global_args, config_kwa
     init=INITCTMARGS()
     CTM0=None;
     CTM_cell, double_B_set,double_T_set,ite_num,ite_err=Fermionic_CTMRG_cell_iPESS(B_set,T_set,init,CTM0, ctm_args, global_args);
-
+    if (ctm_args.doublelayer_on_cpu)&(global_args.device !=double_B_set['1,1'].device) :
+        double_B_set=Cell_to_device(double_B_set,global_args.device,global_args);
+        double_T_set=Cell_to_device(double_T_set,global_args.device,global_args);
     E_total,  ex_set, ey_set, e_diagonala_set, e0_set, eU_set=evaluate_ob_cell_iPESS(parameters, B_set,T_set, double_B_set, double_T_set, CTM_cell, energy_setting, config_kwargs, global_args);
     # print(E_total)
     # print(ex_set)
