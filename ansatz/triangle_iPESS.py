@@ -236,7 +236,41 @@ def CTM_detach(CTM_set,global_args):
             CTM_set['Tset'][str(cx)+','+str(cy)]['T3']=CTM_set['Tset'][str(cx)+','+str(cy)]['T3'].detach()
             CTM_set['Tset'][str(cx)+','+str(cy)]['T4']=CTM_set['Tset'][str(cx)+','+str(cy)]['T4'].detach()
     return CTM_set
+def Cset_detach(C_set,global_args):
+    for cx in range(1,global_args.Lx+1):
+        for cy in range(1,global_args.Ly+1):
+            C_set[str(cx)+','+str(cy)]['C1']=C_set[str(cx)+','+str(cy)]['C1'].detach()
+            C_set[str(cx)+','+str(cy)]['C2']=C_set[str(cx)+','+str(cy)]['C2'].detach()
+            C_set[str(cx)+','+str(cy)]['C3']=C_set[str(cx)+','+str(cy)]['C3'].detach()
+            C_set[str(cx)+','+str(cy)]['C4']=C_set[str(cx)+','+str(cy)]['C4'].detach()
+    return C_set
 
+def Tset_detach(T_set,global_args):
+    for cx in range(1,global_args.Lx+1):
+        for cy in range(1,global_args.Ly+1):
+            T_set[str(cx)+','+str(cy)]['T1']=T_set[str(cx)+','+str(cy)]['T1'].detach()
+            T_set[str(cx)+','+str(cy)]['T2']=T_set[str(cx)+','+str(cy)]['T2'].detach()
+            T_set[str(cx)+','+str(cy)]['T3']=T_set[str(cx)+','+str(cy)]['T3'].detach()
+            T_set[str(cx)+','+str(cy)]['T4']=T_set[str(cx)+','+str(cy)]['T4'].detach()
+    return T_set
+
+def Cset_requires_grad_(C_set,global_args):
+    for cx in range(1,global_args.Lx+1):
+        for cy in range(1,global_args.Ly+1):
+            C_set[str(cx)+','+str(cy)]['C1'].requires_grad_(requires_grad=True)
+            C_set[str(cx)+','+str(cy)]['C2'].requires_grad_(requires_grad=True)
+            C_set[str(cx)+','+str(cy)]['C3'].requires_grad_(requires_grad=True)
+            C_set[str(cx)+','+str(cy)]['C4'].requires_grad_(requires_grad=True)
+    return C_set
+
+def Tset_requires_grad_(T_set,global_args):
+    for cx in range(1,global_args.Lx+1):
+        for cy in range(1,global_args.Ly+1):
+            T_set[str(cx)+','+str(cy)]['T1'].requires_grad_(requires_grad=True)
+            T_set[str(cx)+','+str(cy)]['T2'].requires_grad_(requires_grad=True)
+            T_set[str(cx)+','+str(cy)]['T3'].requires_grad_(requires_grad=True)
+            T_set[str(cx)+','+str(cy)]['T4'].requires_grad_(requires_grad=True)
+    return T_set
 def CTM_copy(CTM_set,global_args):
     Cset_new=OrderedDict()
     Tset_new=OrderedDict()

@@ -38,9 +38,10 @@ chi=40;
 ls_ctm_args= CTMARGS()
 ls_ctm_args.CTM_ite_info=True
 ls_ctm_args.chi=chi;
-ls_ctm_args.CTM_ite_nums=1;
+ls_ctm_args.CTM_ite_nums=10;
 ls_ctm_args.CTM_trun_tol=1e-8;
-ls_ctm_args.doublelayer_on_cpu=True;
+ls_ctm_args.doublelayer_on_cpu=False;
+ls_ctm_args.use_sub_checkpoint=False;
 print(ls_ctm_args, flush=True)
 
 opt_args= OPTARGS()
@@ -94,7 +95,7 @@ def cost_fun(state, ls_ctm_args, energy_setting, global_args, config_kwargs):
         double_B_set=Cell_to_device(double_B_set,global_args.device,global_args);
         double_T_set=Cell_to_device(double_T_set,global_args.device,global_args);
     E_total,  ex_set, ey_set, e_diagonala_set, e0_set, eU_set=evaluate_ob_cell_iPESS(parameters, B_set,T_set, double_B_set, double_T_set, CTM_cell, energy_setting, config_kwargs, global_args);
-    # print(E_total)
+    print(E_total)
     # print(ex_set)
     # print(ey_set)
     # print(e_diagonala_set)

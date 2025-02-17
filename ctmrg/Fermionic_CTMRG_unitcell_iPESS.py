@@ -252,7 +252,21 @@ def Fermionic_CTMRG_cell_iPESS(B_set,T_set,init,CTM0, ctm_setting,global_args):
         #copy.deepcopy is not for autograd
         CTM_cell=CTM_copy(CTM0,global_args)
     # end
-    
+    Cset_cell=CTM_cell['Cset'];
+    Tset_cell=CTM_cell['Tset'];
+
+    if ctm_setting.trivial_initial_CTM:
+        Cset_cell=Cset_detach(Cset_cell,global_args);
+        Tset_cell=Tset_detach(Tset_cell,global_args);
+        with torch.no_grad():
+            Cset_cell_trivial, Tset_cell_trivial=initial_trivial_ctm(Cset_cell, Tset_cell, ctm_setting, global_args);
+        Cset_cell=Cset_requires_grad_(Cset_cell_trivial,global_args);
+        Tset_cell=Tset_requires_grad_(Tset_cell_trivial,global_args);
+
+
+
+
+
     ss_old1_cell= torch.ones((Lx,Ly,chi*2),dtype=torch.float64, device=B_set['1,1'].device);
     ss_old2_cell= torch.ones((Lx,Ly,chi*2),dtype=torch.float64, device=B_set['1,1'].device);
     ss_old3_cell= torch.ones((Lx,Ly,chi*2),dtype=torch.float64, device=B_set['1,1'].device);
@@ -267,8 +281,7 @@ def Fermionic_CTMRG_cell_iPESS(B_set,T_set,init,CTM0, ctm_setting,global_args):
     er4_cell= torch.ones((Lx,Ly));
 
 
-    Cset_cell=CTM_cell['Cset'];
-    Tset_cell=CTM_cell['Tset'];
+
     conv_check="singular_value"
 
 
@@ -342,9 +355,9 @@ def Fermionic_CTMRG_cell_iPESS(B_set,T_set,init,CTM0, ctm_setting,global_args):
         
         for direction in direction_order:
             # print(direction)
-            #Cset_cell,Tset_cell=CTM_ite_cell(Cset_cell, Tset_cell, double_B_cell,double_T_cell, chi, direction,ctm_setting,global_args);
+            #Cset_cell,Tset_cell=CTM_ite_cell(Cset_cell, Tset_cell, double_B_cell,double_T_cell, direction,ctm_setting,global_args);
             # print(Cset_cell['1,1']['C1'].requires_grad)
-            Cset_cell,Tset_cell=checkpoint(CTM_ite_cell, Cset_cell, Tset_cell, double_B_cell,double_T_cell, chi, direction,ctm_setting,global_args, use_reentrant=False)
+            Cset_cell,Tset_cell=checkpoint(CTM_ite_cell, Cset_cell, Tset_cell, double_B_cell,double_T_cell, direction,ctm_setting,global_args, use_reentrant=False)
             # print(Cset_cell['1,1']['C1'].requires_grad)
         # end
         
@@ -545,7 +558,8 @@ def final_CTM_update(Cset_cell,Tset_cell, M1tem_cell,M5tem_cell,M7tem_cell, coor
 
 
 
-# def ctm_svd_segment(MMup, MMup_reflect,MMlow, MMlow_reflect,chi,ctm_setting):
+# def ctm_svd_segment(MMup, MMup_reflect,MMlow, MMlow_reflect,ctm_setting):
+#     chi=ctm_setting.chi
 #     def truncation_f(S):
 #         return yastn.linalg.truncation_mask_multiplets(S, keep_multiplets=True, D_total=chi, tol=ctm_setting.CTM_trun_tol, tol_block=0.0, eps_multiplet=1.0e-8)
 #     # RMup=permute(MMup*MMup_reflect,(3,4,),(1,2,));
@@ -629,7 +643,7 @@ def get_M(coord,direction,double_B_cell,double_T_cell,Cset_cell,Tset_cell, ctm_s
     # MMlow_reflect=permute(MMlow_reflect,(1,2,),(3,4,))
     #MMlow_reflect=yastn.transpose(MMlow_reflect, axes=(0,1,2,3))
 
-    #PM, PM_inv =checkpoint(ctm_svd_segment,MMup, MMup_reflect,MMlow, MMlow_reflect,chi,ctm_setting, use_reentrant=False)
+    #PM, PM_inv =checkpoint(ctm_svd_segment,MMup, MMup_reflect,MMlow, MMlow_reflect,ctm_setting, use_reentrant=False)
 
 
     # RMup=permute(MMup*MMup_reflect,(3,4,),(1,2,));
@@ -699,7 +713,8 @@ def get_M(coord,direction,double_B_cell,double_T_cell,Cset_cell,Tset_cell, ctm_s
 #     M7tem_cell[str(Pos[1-1])+','+str(Pos[2-1])]=M7tem;
 #     return PM_cell, PM_inv_cell, M1tem_cell, M5tem_cell, M7tem_cell
 
-def ctm_update_single_cx(cx,cy_max, Cset_cell, Tset_cell, double_B_cell,double_T_cell, chi, direction, ctm_setting, global_args):
+def ctm_update_single_cx(cx,cy_max, Cset_cell, Tset_cell, double_B_cell,double_T_cell, direction, ctm_setting, global_args):
+    chi=ctm_setting.chi;
     def truncation_f(S):
         return yastn.linalg.truncation_mask_multiplets(S, keep_multiplets=True, D_total=chi, tol=ctm_setting.CTM_trun_tol, tol_block=0.0, eps_multiplet=1.0e-8)
     Lx=global_args.Lx;
@@ -712,7 +727,7 @@ def ctm_update_single_cx(cx,cy_max, Cset_cell, Tset_cell, double_B_cell,double_T
 
     for cy in range(1,cy_max+1):
         coord=[cx,cy];
-        print(coord)
+        #print(coord)
 
         ##########################
 
@@ -745,7 +760,7 @@ def ctm_update_single_cx(cx,cy_max, Cset_cell, Tset_cell, double_B_cell,double_T
         # # MMlow_reflect=permute(MMlow_reflect,(1,2,),(3,4,))
         # #MMlow_reflect=yastn.transpose(MMlow_reflect, axes=(0,1,2,3))
 
-        # #PM, PM_inv =checkpoint(ctm_svd_segment,MMup, MMup_reflect,MMlow, MMlow_reflect,chi,ctm_setting, use_reentrant=False)
+        # #PM, PM_inv =checkpoint(ctm_svd_segment,MMup, MMup_reflect,MMlow, MMlow_reflect,ctm_setting, use_reentrant=False)
 
 
         # # RMup=permute(MMup*MMup_reflect,(3,4,),(1,2,));
@@ -763,7 +778,10 @@ def ctm_update_single_cx(cx,cy_max, Cset_cell, Tset_cell, double_B_cell,double_T
         # M = yastn.ncon([RMup, RMlow], [[-1,-2,1,2], [1,2,-3,-4]]);
 
         #####################################
-        M,RMup,RMlow=checkpoint(get_M, coord,direction,double_B_cell,double_T_cell,Cset_cell,Tset_cell, ctm_setting, global_args, use_reentrant=False);
+        if ctm_setting.use_sub_checkpoint:
+            M,RMup,RMlow=checkpoint(get_M, coord,direction,double_B_cell,double_T_cell,Cset_cell,Tset_cell, ctm_setting, global_args, use_reentrant=False);
+        else:
+            M,RMup,RMlow=get_M(coord,direction,double_B_cell,double_T_cell,Cset_cell,Tset_cell, ctm_setting, global_args);
         #print(M.device)
         #####################################
 
@@ -883,7 +901,7 @@ def ctm_update_single_cx(cx,cy_max, Cset_cell, Tset_cell, double_B_cell,double_T
 
     return Cset_cell,Tset_cell
 
-def CTM_ite_cell_continuous_update(Cset_cell, Tset_cell, double_B_cell,double_T_cell, chi, direction, ctm_setting, global_args):
+def CTM_ite_cell_continuous_update(Cset_cell, Tset_cell, double_B_cell,double_T_cell, direction, ctm_setting, global_args):
     Lx=global_args.Lx;
     Ly=global_args.Ly;
     #println(direction)    
@@ -905,8 +923,8 @@ def CTM_ite_cell_continuous_update(Cset_cell, Tset_cell, double_B_cell,double_T_
     cy_max=cx_cy_matrix[direction-1,2-1];
 
     for cx in range(1,cx_max+1):
-        # Cset_cell,Tset_cell=ctm_update_single_cx(cx,cy_max,Cset_cell, Tset_cell, double_B_cell,double_T_cell, chi, direction, ctm_setting, global_args);
-        Cset_cell,Tset_cell=checkpoint(ctm_update_single_cx, cx,cy_max,Cset_cell, Tset_cell, double_B_cell,double_T_cell, chi, direction, ctm_setting, global_args, use_reentrant=False);
+        # Cset_cell,Tset_cell=ctm_update_single_cx(cx,cy_max,Cset_cell, Tset_cell, double_B_cell,double_T_cell, direction, ctm_setting, global_args);
+        Cset_cell,Tset_cell=checkpoint(ctm_update_single_cx, cx,cy_max,Cset_cell, Tset_cell, double_B_cell,double_T_cell, direction, ctm_setting, global_args, use_reentrant=False);
     return Cset_cell,Tset_cell
 
 
@@ -1001,3 +1019,34 @@ def init_CTM_cell(B_set,T_set,ls_ctm_args, global_args):
     return CTM_cell
 # end
 
+
+
+def initial_trivial_ctm(Cset_cell, Tset_cell, ctm_setting, global_args):
+    
+    seed_value=123;
+    numpy.random.seed(seed_value);
+    torch.manual_seed(seed_value);
+    Lx=global_args.Lx;
+    Ly=global_args.Ly;
+    config_Z2=Cset_cell['1,1']['C1'].config;
+    dim_even=5;
+    dim_odd=5;
+    for cx in range(1,Lx+1):
+        for cy in range(1,Ly+1):
+            for direction in [1,2,3,4]:
+                C_=Cset_cell[str(cx)+','+str(cy)]['C'+str(direction)];
+                Legs=C_.get_legs();
+                leg1=yastn.Leg(config_Z2, s=Legs[1-1].s, t=(0, 1), D=(dim_even, dim_odd));
+                leg2=yastn.Leg(config_Z2, s=Legs[2-1].s, t=(0, 1), D=(dim_even, dim_odd));
+                C_=yastn.rand(config=config_Z2, legs=[leg1, leg2])
+                Cset_cell[str(cx)+','+str(cy)]['C'+str(direction)]=C_;
+
+                T_=Tset_cell[str(cx)+','+str(cy)]['T'+str(direction)];
+                Legs=T_.get_legs();
+                leg1=yastn.Leg(config_Z2, s=Legs[1-1].s, t=(0, 1), D=(dim_even, dim_odd));
+                leg2=Legs[2-1];
+                leg3=yastn.Leg(config_Z2, s=Legs[3-1].s, t=(0, 1), D=(dim_even, dim_odd));
+                T_=yastn.rand(config=config_Z2, legs=[leg1, leg2, leg3])
+                Tset_cell[str(cx)+','+str(cy)]['T'+str(direction)]=T_;
+    
+    return Cset_cell,Tset_cell
