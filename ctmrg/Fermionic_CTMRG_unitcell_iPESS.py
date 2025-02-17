@@ -225,9 +225,6 @@ def Fermionic_CTMRG_cell_iPESS(B_set,T_set,init,CTM0, ctm_setting,global_args):
 
                 double_B_cell[str(cx)+','+str(cy)]= B_double;
                 double_T_cell[str(cx)+','+str(cy)]= T_double;
-        if ctm_setting.doublelayer_on_cpu:
-            double_B_cell=Cell_to_device(double_B_cell,'cpu',global_args);
-            double_T_cell=Cell_to_device(double_T_cell,'cpu',global_args);
                 # U_L_cell=fill_tuple(U_L_cell, U_L_, cx,cy);
                 # U_D_cell=fill_tuple(U_D_cell, U_D_, cx,cy);
                 # U_R_cell=fill_tuple(U_R_cell, U_R_, cx,cy);
@@ -252,21 +249,7 @@ def Fermionic_CTMRG_cell_iPESS(B_set,T_set,init,CTM0, ctm_setting,global_args):
         #copy.deepcopy is not for autograd
         CTM_cell=CTM_copy(CTM0,global_args)
     # end
-    Cset_cell=CTM_cell['Cset'];
-    Tset_cell=CTM_cell['Tset'];
-
-    if ctm_setting.trivial_initial_CTM:
-        Cset_cell=Cset_detach(Cset_cell,global_args);
-        Tset_cell=Tset_detach(Tset_cell,global_args);
-        with torch.no_grad():
-            Cset_cell_trivial, Tset_cell_trivial=initial_trivial_ctm(Cset_cell, Tset_cell, ctm_setting, global_args);
-        Cset_cell=Cset_requires_grad_(Cset_cell_trivial,global_args);
-        Tset_cell=Tset_requires_grad_(Tset_cell_trivial,global_args);
-
-
-
-
-
+    
     ss_old1_cell= torch.ones((Lx,Ly,chi*2),dtype=torch.float64, device=B_set['1,1'].device);
     ss_old2_cell= torch.ones((Lx,Ly,chi*2),dtype=torch.float64, device=B_set['1,1'].device);
     ss_old3_cell= torch.ones((Lx,Ly,chi*2),dtype=torch.float64, device=B_set['1,1'].device);
@@ -281,7 +264,8 @@ def Fermionic_CTMRG_cell_iPESS(B_set,T_set,init,CTM0, ctm_setting,global_args):
     er4_cell= torch.ones((Lx,Ly));
 
 
-
+    Cset_cell=CTM_cell['Cset'];
+    Tset_cell=CTM_cell['Tset'];
     conv_check="singular_value"
 
 
@@ -355,9 +339,9 @@ def Fermionic_CTMRG_cell_iPESS(B_set,T_set,init,CTM0, ctm_setting,global_args):
         
         for direction in direction_order:
             # print(direction)
-            #Cset_cell,Tset_cell=CTM_ite_cell(Cset_cell, Tset_cell, double_B_cell,double_T_cell, direction,ctm_setting,global_args);
+            #Cset_cell,Tset_cell=CTM_ite_cell(Cset_cell, Tset_cell, double_B_cell,double_T_cell, chi, direction,ctm_setting,global_args);
             # print(Cset_cell['1,1']['C1'].requires_grad)
-            Cset_cell,Tset_cell=checkpoint(CTM_ite_cell, Cset_cell, Tset_cell, double_B_cell,double_T_cell, direction,ctm_setting,global_args, use_reentrant=False)
+            Cset_cell,Tset_cell=checkpoint(CTM_ite_cell, Cset_cell, Tset_cell, double_B_cell,double_T_cell, chi, direction,ctm_setting,global_args, use_reentrant=False)
             # print(Cset_cell['1,1']['C1'].requires_grad)
         # end
         
@@ -459,24 +443,19 @@ def Fermionic_CTMRG_cell_iPESS(B_set,T_set,init,CTM0, ctm_setting,global_args):
     CTM_cell['Tset']=Tset_cell;
     return CTM_cell, double_B_cell,double_T_cell,ite_num,ite_err
 
-def get_AA_direction(double_B_cell,double_T_cell,direction,pos, ctm_setting, global_args):
+def get_AA_direction(double_B_cell,double_T_cell,direction,pos):
     B_double=double_B_cell[str(pos[1-1])+','+str(pos[2-1])];
     T_double=double_T_cell[str(pos[1-1])+','+str(pos[2-1])];
     # @tensor AA[:]:=B_double[-1,1,-4]*T_double[-2,-3,1];
-
-    if (ctm_setting.doublelayer_on_cpu)&(global_args.device != 'cpu'):
-        AA = yastn.ncon([B_double.to(global_args.device), T_double.to(global_args.device)], [[-1,1,-4], [-2,-3,1]])
-    else:
-        AA = yastn.ncon([B_double, T_double], [[-1,1,-4], [-2,-3,1]])
+    AA = yastn.ncon([B_double, T_double], [[-1,1,-4], [-2,-3,1]])
     return rotate_AA_direction(AA,direction)
 
 
 
-def build_corner_MMup(coord_,direction_,double_B_cell_,double_T_cell_,Cset_cell_,Tset_cell_,ctm_setting, global_args):
-    Lx=global_args.Lx;
-    Ly=global_args.Ly;
+def build_corner_MMup(coord_,direction_,double_B_cell_,double_T_cell_,Cset_cell_,Tset_cell_,Lx,Ly):
+    
     Pos=convert_cell_posit(coord_[1-1],coord_[2-1],1,1,direction_,Lx,Ly);
-    AA=get_AA_direction(double_B_cell_,double_T_cell_,direction_,Pos,ctm_setting, global_args);
+    AA=get_AA_direction(double_B_cell_,double_T_cell_,direction_,Pos);
     Pos=convert_cell_posit(coord_[1-1],coord_[2-1],0,0,direction_,Lx,Ly);
     C1=Cset_cell_[str(Pos[1-1])+','+str(Pos[2-1])]['C'+str(mod1(direction_,4))];
     Pos=convert_cell_posit(coord_[1-1],coord_[2-1],1,0,direction_,Lx,Ly);
@@ -488,11 +467,10 @@ def build_corner_MMup(coord_,direction_,double_B_cell_,double_T_cell_,Cset_cell_
     return MMup_
 
 
-def build_corner_MMlow(coord_,direction_,double_B_cell_,double_T_cell_,Cset_cell_,Tset_cell_,ctm_setting, global_args):
-    Lx=global_args.Lx;
-    Ly=global_args.Ly;
+def build_corner_MMlow(coord_,direction_,double_B_cell_,double_T_cell_,Cset_cell_,Tset_cell_,Lx,Ly):
+
     Pos=convert_cell_posit(coord_[1-1],coord_[2-1],1,2,direction_,Lx,Ly);
-    AA=get_AA_direction(double_B_cell_,double_T_cell_,direction_,Pos,ctm_setting, global_args);
+    AA=get_AA_direction(double_B_cell_,double_T_cell_,direction_,Pos);
     Pos=convert_cell_posit(coord_[1-1],coord_[2-1],0,2,direction_,Lx,Ly);
     T4=Tset_cell_[str(Pos[1-1])+','+str(Pos[2-1])]['T'+str(mod1(direction_-1,4))];
     Pos=convert_cell_posit(coord_[1-1],coord_[2-1],0,3,direction_,Lx,Ly);
@@ -505,11 +483,10 @@ def build_corner_MMlow(coord_,direction_,double_B_cell_,double_T_cell_,Cset_cell
 
 
 
-def build_corner_MMup_reflect(coord_,direction_,double_B_cell_,double_T_cell_,Cset_cell_,Tset_cell_,ctm_setting, global_args):
-    Lx=global_args.Lx;
-    Ly=global_args.Ly;
+def build_corner_MMup_reflect(coord_,direction_,double_B_cell_,double_T_cell_,Cset_cell_,Tset_cell_,Lx,Ly):
+    
     Pos=convert_cell_posit(coord_[1-1],coord_[2-1],2,1,direction_,Lx,Ly);
-    AA=get_AA_direction(double_B_cell_,double_T_cell_,direction_,Pos,ctm_setting, global_args);
+    AA=get_AA_direction(double_B_cell_,double_T_cell_,direction_,Pos);
     Pos=convert_cell_posit(coord_[1-1],coord_[2-1],2,0,direction_,Lx,Ly);
     T1=Tset_cell_[str(Pos[1-1])+','+str(Pos[2-1])]['T'+str(mod1(direction_,4))];
     Pos=convert_cell_posit(coord_[1-1],coord_[2-1],3,0,direction_,Lx,Ly);
@@ -521,11 +498,10 @@ def build_corner_MMup_reflect(coord_,direction_,double_B_cell_,double_T_cell_,Cs
     return MMup_reflect_
 
 
-def build_corner_MMlow_reflect(coord_,direction_,double_B_cell_,double_T_cell_,Cset_cell_,Tset_cell_,ctm_setting, global_args):
-    Lx=global_args.Lx;
-    Ly=global_args.Ly;
+def build_corner_MMlow_reflect(coord_,direction_,double_B_cell_,double_T_cell_,Cset_cell_,Tset_cell_,Lx,Ly):
+ 
     Pos=convert_cell_posit(coord_[1-1],coord_[2-1],2,2,direction_,Lx,Ly);
-    AA=get_AA_direction(double_B_cell_,double_T_cell_,direction_,Pos,ctm_setting, global_args);
+    AA=get_AA_direction(double_B_cell_,double_T_cell_,direction_,Pos);
     Pos=convert_cell_posit(coord_[1-1],coord_[2-1],3,2,direction_,Lx,Ly);
     T2=Tset_cell_[str(Pos[1-1])+','+str(Pos[2-1])]['T'+str(mod1(direction_+1,4))];
     Pos=convert_cell_posit(coord_[1-1],coord_[2-1],2,3,direction_,Lx,Ly);
@@ -557,164 +533,7 @@ def final_CTM_update(Cset_cell,Tset_cell, M1tem_cell,M5tem_cell,M7tem_cell, coor
     return Cset_cell,Tset_cell
 
 
-
-# def ctm_svd_segment(MMup, MMup_reflect,MMlow, MMlow_reflect,ctm_setting):
-#     chi=ctm_setting.chi
-#     def truncation_f(S):
-#         return yastn.linalg.truncation_mask_multiplets(S, keep_multiplets=True, D_total=chi, tol=ctm_setting.CTM_trun_tol, tol_block=0.0, eps_multiplet=1.0e-8)
-#     # RMup=permute(MMup*MMup_reflect,(3,4,),(1,2,));
-#     RMup = yastn.ncon([MMup, MMup_reflect], [[-3,-4,1,2], [1,2,-1,-2]]);
-
-#     # RMlow=MMlow*MMlow_reflect;
-#     RMlow = yastn.ncon([MMlow, MMlow_reflect], [[-1,-2,1,2], [1,2,-3,-4]]);
-
-#     RMlow_norm=yastn.linalg.norm(RMlow);
-#     RMlow= RMlow/RMlow_norm;
-#     RMup_norm=yastn.linalg.norm(RMup);
-#     RMup= RMup/RMup_norm;
-
-#     # M=RMup*RMlow;
-#     M = yastn.ncon([RMup, RMlow], [[-1,-2,1,2], [1,2,-3,-4]]);
-
-
-#     #####################################
-
-
-#     # uM,sM,vM = my_tsvd(M; trunc=truncdim(chi+chi_extra));
-#     chi_extra=3;
-#     M=M/(yastn.linalg.norm(M))
-
-
-#     # uM,sM,vM = yastn.linalg.svd_with_truncation(M, axes=((0, 1), (2, 3)), D_total=chi+chi_extra,svd_on_cpu=True, truncate_multiplets=True, tol=ctm_setting.CTM_trun_tol);
-#     uM,sM,vM = yastn.linalg.svd_with_truncation(M, axes=((0, 1), (2, 3)), D_total=chi+chi_extra, svd_on_cpu=True, tol=ctm_setting.CTM_trun_tol, mask_f=truncation_f);
-
-#     # Legs=M.get_legs();
-#     # config_kwargs = {"backend": "torch", "default_dtype": 'complex128', 'default_device': 'cuda', 'Lx':6, 'Ly':6}
-#     # config_Z2 = yastn.make_config(sym='Z2',fermionic=True, **config_kwargs)
-#     # CdagC_string = yastn.eye(config=config_Z2,legs=Legs[2], isdiag=False)
-#     #sM_1d,bb=yastn.Tensor.compress_to_1d(sM);
-#     #print(sM_1d)
-
-#     #############################################
-
-
-
-#     sM_norm=yastn.linalg.norm(sM);
-#     sM=sM/sM_norm;
-    
-#     #sM_inv_sqrt=sdiag_inv_sqrt(sM);
-#     # sM_inv_sqrt=sM.rsqrt(cutoff=1e-10);
-#     sM_inv_sqrt=sM.rsqrt(cutoff=ctm_setting.CTM_trun_tol);
-#     # sM_inv_sqrt=sM_inv_sqrt.rsqrt(cutoff=1e-10);
-#     #sM_inv_sqrt_1d,bb=yastn.Tensor.compress_to_1d(sM_inv_sqrt);
-#     #print(sM_inv_sqrt_1d)
-
-#     # PM_inv=RMlow*vM'*sM_inv_sqrt;
-#     vMp=vM.conj();
-#     PM_inv = yastn.ncon([RMlow, vMp, sM_inv_sqrt], [[-1,-2,1,2], [3,1,2], [3,-3]]);
-
-    
-#     # PM=sM_inv_sqrt*uM'*RMup;
-#     #PM=permute(PM,(2,3,),(1,));
-#     uMp=uM.conj();
-#     PM = yastn.ncon([sM_inv_sqrt, uMp, RMup], [[-3,3], [1,2,3], [1,2,-1,-2]]);
-#     return PM, PM_inv 
-
-
-def get_M(coord,direction,double_B_cell,double_T_cell,Cset_cell,Tset_cell, ctm_setting, global_args):
-    MMup=build_corner_MMup(coord,direction,double_B_cell,double_T_cell,Cset_cell,Tset_cell,ctm_setting, global_args);
-    MMlow=build_corner_MMlow(coord,direction,double_B_cell,double_T_cell,Cset_cell,Tset_cell,ctm_setting, global_args);
-    MMup_reflect=build_corner_MMup_reflect(coord,direction,double_B_cell,double_T_cell,Cset_cell,Tset_cell,ctm_setting, global_args);
-    MMlow_reflect=build_corner_MMlow_reflect(coord,direction,double_B_cell,double_T_cell,Cset_cell,Tset_cell,ctm_setting, global_args);
-
-    ############################
-
-
-
-    #MMup=permute(MMup,(1,2,),(3,4,))
-    #MMup=yastn.transpose(MMup, axes=(0,1,2,3))
-
-    # MMlow=permute(MMlow,(1,2,),(3,4,))
-    #MMlow=yastn.transpose(MMlow, axes=(0,1,2,3))
-
-    # MMup_reflect=permute(MMup_reflect,(1,2,),(3,4,))
-    #MMup_reflect=yastn.transpose(MMup_reflect, axes=(0,1,2,3))
-
-    # MMlow_reflect=permute(MMlow_reflect,(1,2,),(3,4,))
-    #MMlow_reflect=yastn.transpose(MMlow_reflect, axes=(0,1,2,3))
-
-    #PM, PM_inv =checkpoint(ctm_svd_segment,MMup, MMup_reflect,MMlow, MMlow_reflect,ctm_setting, use_reentrant=False)
-
-
-    # RMup=permute(MMup*MMup_reflect,(3,4,),(1,2,));
-    RMup = yastn.ncon([MMup, MMup_reflect], [[-3,-4,1,2], [1,2,-1,-2]]);
-
-    # RMlow=MMlow*MMlow_reflect;
-    RMlow = yastn.ncon([MMlow, MMlow_reflect], [[-1,-2,1,2], [1,2,-3,-4]]);
-
-    RMlow_norm=yastn.linalg.norm(RMlow);
-    RMlow= RMlow/RMlow_norm;
-    RMup_norm=yastn.linalg.norm(RMup);
-    RMup= RMup/RMup_norm;
-
-    # M=RMup*RMlow;
-    M = yastn.ncon([RMup, RMlow], [[-1,-2,1,2], [1,2,-3,-4]]);
-    M=M/(yastn.linalg.norm(M));
-
-    if ctm_setting.doublelayer_on_cpu:
-        return M.to('cpu'),RMup.to('cpu'),RMlow.to('cpu')
-    else:
-        return M,RMup,RMlow
-
-
-
-# def prepare_update(Cset_cell, Tset_cell, double_B_cell,double_T_cell, PM_cell, PM_inv_cell, M1tem_cell, M5tem_cell, M7tem_cell, coord,direction,Lx,Ly):
-#     Pos=convert_cell_posit(coord[1-1],coord[2-1],1,2,direction, Lx,Ly);
-#     AA=get_AA_direction(double_B_cell,double_T_cell,direction,Pos);
-#     Pos=convert_cell_posit(coord[1-1],coord[2-1],0,2,direction, Lx,Ly);
-#     T4=Tset_cell[str(Pos[1-1])+','+str(Pos[2-1])]['T'+str(mod1(direction-1,4))];
-#     Pos=convert_cell_posit(coord[1-1],coord[2-1],1,0,direction, Lx,Ly);
-#     T1=Tset_cell[str(Pos[1-1])+','+str(Pos[2-1])]['T'+str(mod1(direction,4))];
-#     Pos=convert_cell_posit(coord[1-1],coord[2-1],1,3,direction, Lx,Ly);
-#     T3=Tset_cell[str(Pos[1-1])+','+str(Pos[2-1])]['T'+str(mod1(direction-2,4))];
-#     Pos=convert_cell_posit(coord[1-1],coord[2-1],0,0,direction, Lx,Ly);
-#     C1=Cset_cell[str(Pos[1-1])+','+str(Pos[2-1])]['C'+str(mod1(direction,4))];
-#     Pos=convert_cell_posit(coord[1-1],coord[2-1],0,3,direction, Lx,Ly);
-#     C4=Cset_cell[str(Pos[1-1])+','+str(Pos[2-1])]['C'+str(mod1(direction-1,4))];
-
-
-#     Posa=convert_cell_posit(coord[1-1],coord[2-1],0,2,direction, Lx,Ly);
-#     Posb=convert_cell_posit(coord[1-1],coord[2-1],0,2,direction, Lx,Ly);
-#     # @tensor M5tem[:]:=T4[4,3,1]*AA[3,5,-2,2]*PM_inv_cell[Posa[1-1]][Posa[2-1]][4,5,-1]*PM_cell[Posb[1-1]][Posb[2-1]][1,2,-3];
-#     M5tem = yastn.ncon([T4, AA, PM_inv_cell[str(Posa[1-1])+','+str(Posa[2-1])], PM_cell[str(Posb[1-1])+','+str(Posb[2-1])]], [[4,3,1], [3,5,-2,2], [4,5,-1],[1,2,-3]]);
-#     Pos=convert_cell_posit(coord[1-1],coord[2-1],0,0,direction, Lx,Ly);
-#     #@tensor M1tem[:]:=C1[1,2]*T1[2,3,-2]*PM_inv_cell[Pos[1-1]][Pos[2-1]][1,3,-1];
-#     M1tem = yastn.ncon([C1, T1, PM_inv_cell[str(Pos[1-1])+','+str(Pos[2-1])]], [[1,2], [2,3,-2], [1,3,-1]]);
-#     Pos=convert_cell_posit(coord[1-1],coord[2-1],0,3,direction, Lx,Ly);
-#     #@tensor M7tem[:]:=C4[1,2]*T3[-1,3,1]*PM_cell[Pos[1-1]][Pos[2-1]][2,3,-2];
-#     M7tem = yastn.ncon([C4, T3, PM_cell[str(Pos[1-1])+','+str(Pos[2-1])]], [[1,2], [-1,3,1], [2,3,-2]]);
-
-#     M5tem_norm=yastn.linalg.norm(M5tem);
-#     M1tem_norm=yastn.linalg.norm(M1tem);
-#     M7tem_norm=yastn.linalg.norm(M7tem);
-
-#     M5tem=M5tem/M5tem_norm;
-#     M1tem=M1tem/M1tem_norm;
-#     M7tem=M7tem/M7tem_norm;
-
-#     Pos=convert_cell_posit(coord[1-1],coord[2-1],1,2,direction, Lx,Ly);
-#     #M5tem_cell[Pos[1-1]][Pos[2-1]]=M5tem;
-#     M5tem_cell[str(Pos[1-1])+','+str(Pos[2-1])]=M5tem;
-#     Pos=convert_cell_posit(coord[1-1],coord[2-1],1,0,direction, Lx,Ly);
-#     #M1tem_cell[Pos[1-1]][Pos[2-1]]=M1tem;
-#     M1tem_cell[str(Pos[1-1])+','+str(Pos[2-1])]=M1tem;
-#     Pos=convert_cell_posit(coord[1-1],coord[2-1],1,3,direction, Lx,Ly);
-#     #M7tem_cell[Pos[1-1]][Pos[2-1]]=M7tem;
-#     M7tem_cell[str(Pos[1-1])+','+str(Pos[2-1])]=M7tem;
-#     return PM_cell, PM_inv_cell, M1tem_cell, M5tem_cell, M7tem_cell
-
-def ctm_update_single_cx(cx,cy_max, Cset_cell, Tset_cell, double_B_cell,double_T_cell, direction, ctm_setting, global_args):
-    chi=ctm_setting.chi;
+def ctm_update_single_cx(cx,cy_max, Cset_cell, Tset_cell, double_B_cell,double_T_cell, chi, direction, ctm_setting, global_args):
     def truncation_f(S):
         return yastn.linalg.truncation_mask_multiplets(S, keep_multiplets=True, D_total=chi, tol=ctm_setting.CTM_trun_tol, tol_block=0.0, eps_multiplet=1.0e-8)
     Lx=global_args.Lx;
@@ -727,77 +546,61 @@ def ctm_update_single_cx(cx,cy_max, Cset_cell, Tset_cell, double_B_cell,double_T
 
     for cy in range(1,cy_max+1):
         coord=[cx,cy];
-        #print(coord)
 
         ##########################
 
-        # MMup=build_corner_MMup(coord,direction,double_B_cell,double_T_cell,Cset_cell,Tset_cell,Lx,Ly);
+        MMup=build_corner_MMup(coord,direction,double_B_cell,double_T_cell,Cset_cell,Tset_cell,Lx,Ly);
 
-        # MMlow=build_corner_MMlow(coord,direction,double_B_cell,double_T_cell,Cset_cell,Tset_cell,Lx,Ly);
+        MMlow=build_corner_MMlow(coord,direction,double_B_cell,double_T_cell,Cset_cell,Tset_cell,Lx,Ly);
 
-        # MMup_reflect=build_corner_MMup_reflect(coord,direction,double_B_cell,double_T_cell,Cset_cell,Tset_cell,Lx,Ly);
+        MMup_reflect=build_corner_MMup_reflect(coord,direction,double_B_cell,double_T_cell,Cset_cell,Tset_cell,Lx,Ly);
 
-        # MMlow_reflect=build_corner_MMlow_reflect(coord,direction,double_B_cell,double_T_cell,Cset_cell,Tset_cell,Lx,Ly);
+        MMlow_reflect=build_corner_MMlow_reflect(coord,direction,double_B_cell,double_T_cell,Cset_cell,Tset_cell,Lx,Ly);
 
-        # MMup=checkpoint(build_corner_MMup, coord,direction,double_B_cell,double_T_cell,Cset_cell,Tset_cell,Lx,Ly, use_reentrant=False);
-        # MMlow=checkpoint(build_corner_MMlow, coord,direction,double_B_cell,double_T_cell,Cset_cell,Tset_cell,Lx,Ly, use_reentrant=False);
-        # MMup_reflect=checkpoint(build_corner_MMup_reflect, coord,direction,double_B_cell,double_T_cell,Cset_cell,Tset_cell,Lx,Ly, use_reentrant=False);
-        # MMlow_reflect=checkpoint(build_corner_MMlow_reflect, coord,direction,double_B_cell,double_T_cell,Cset_cell,Tset_cell,Lx,Ly, use_reentrant=False);
-
-        # ############################
+        ############################
 
 
 
-        # #MMup=permute(MMup,(1,2,),(3,4,))
-        # #MMup=yastn.transpose(MMup, axes=(0,1,2,3))
+        #MMup=permute(MMup,(1,2,),(3,4,))
+        #MMup=yastn.transpose(MMup, axes=(0,1,2,3))
 
-        # # MMlow=permute(MMlow,(1,2,),(3,4,))
-        # #MMlow=yastn.transpose(MMlow, axes=(0,1,2,3))
+        # MMlow=permute(MMlow,(1,2,),(3,4,))
+        #MMlow=yastn.transpose(MMlow, axes=(0,1,2,3))
 
-        # # MMup_reflect=permute(MMup_reflect,(1,2,),(3,4,))
-        # #MMup_reflect=yastn.transpose(MMup_reflect, axes=(0,1,2,3))
+        # MMup_reflect=permute(MMup_reflect,(1,2,),(3,4,))
+        #MMup_reflect=yastn.transpose(MMup_reflect, axes=(0,1,2,3))
 
-        # # MMlow_reflect=permute(MMlow_reflect,(1,2,),(3,4,))
-        # #MMlow_reflect=yastn.transpose(MMlow_reflect, axes=(0,1,2,3))
+        # MMlow_reflect=permute(MMlow_reflect,(1,2,),(3,4,))
+        #MMlow_reflect=yastn.transpose(MMlow_reflect, axes=(0,1,2,3))
 
-        # #PM, PM_inv =checkpoint(ctm_svd_segment,MMup, MMup_reflect,MMlow, MMlow_reflect,ctm_setting, use_reentrant=False)
+        
+
+        # RMup=permute(MMup*MMup_reflect,(3,4,),(1,2,));
+        RMup = yastn.ncon([MMup, MMup_reflect], [[-3,-4,1,2], [1,2,-1,-2]]);
+
+        # RMlow=MMlow*MMlow_reflect;
+        RMlow = yastn.ncon([MMlow, MMlow_reflect], [[-1,-2,1,2], [1,2,-3,-4]]);
+
+        RMlow_norm=yastn.linalg.norm(RMlow);
+        RMlow= RMlow/RMlow_norm;
+        RMup_norm=yastn.linalg.norm(RMup);
+        RMup= RMup/RMup_norm;
+
+        # M=RMup*RMlow;
+        M = yastn.ncon([RMup, RMlow], [[-1,-2,1,2], [1,2,-3,-4]]);
 
 
-        # # RMup=permute(MMup*MMup_reflect,(3,4,),(1,2,));
-        # RMup = yastn.ncon([MMup, MMup_reflect], [[-3,-4,1,2], [1,2,-1,-2]]);
-
-        # # RMlow=MMlow*MMlow_reflect;
-        # RMlow = yastn.ncon([MMlow, MMlow_reflect], [[-1,-2,1,2], [1,2,-3,-4]]);
-
-        # RMlow_norm=yastn.linalg.norm(RMlow);
-        # RMlow= RMlow/RMlow_norm;
-        # RMup_norm=yastn.linalg.norm(RMup);
-        # RMup= RMup/RMup_norm;
-
-        # # M=RMup*RMlow;
-        # M = yastn.ncon([RMup, RMlow], [[-1,-2,1,2], [1,2,-3,-4]]);
-
-        #####################################
-        if ctm_setting.use_sub_checkpoint:
-            M,RMup,RMlow=checkpoint(get_M, coord,direction,double_B_cell,double_T_cell,Cset_cell,Tset_cell, ctm_setting, global_args, use_reentrant=False);
-        else:
-            M,RMup,RMlow=get_M(coord,direction,double_B_cell,double_T_cell,Cset_cell,Tset_cell, ctm_setting, global_args);
-        #print(M.device)
         #####################################
 
 
         # uM,sM,vM = my_tsvd(M; trunc=truncdim(chi+chi_extra));
         chi_extra=3;
-        
+        M=M/(yastn.linalg.norm(M))
 
 
         # uM,sM,vM = yastn.linalg.svd_with_truncation(M, axes=((0, 1), (2, 3)), D_total=chi+chi_extra,svd_on_cpu=True, truncate_multiplets=True, tol=ctm_setting.CTM_trun_tol);
         uM,sM,vM = yastn.linalg.svd_with_truncation(M, axes=((0, 1), (2, 3)), D_total=chi+chi_extra, svd_on_cpu=True, tol=ctm_setting.CTM_trun_tol, mask_f=truncation_f);
-        if ctm_setting.doublelayer_on_cpu:#send back to gpu 
-            uM=uM.to(global_args.device);
-            sM=sM.to(global_args.device);
-            vM=vM.to(global_args.device);
-        
+
         # Legs=M.get_legs();
         # config_kwargs = {"backend": "torch", "default_dtype": 'complex128', 'default_device': 'cuda', 'Lx':6, 'Ly':6}
         # config_Z2 = yastn.make_config(sym='Z2',fermionic=True, **config_kwargs)
@@ -806,7 +609,7 @@ def ctm_update_single_cx(cx,cy_max, Cset_cell, Tset_cell, double_B_cell,double_T
         #print(sM_1d)
 
         #############################################
-
+    
 
 
         sM_norm=yastn.linalg.norm(sM);
@@ -821,20 +624,13 @@ def ctm_update_single_cx(cx,cy_max, Cset_cell, Tset_cell, double_B_cell,double_T
 
         # PM_inv=RMlow*vM'*sM_inv_sqrt;
         vMp=vM.conj();
-        if ctm_setting.doublelayer_on_cpu:#send back to gpu 
-            PM_inv = yastn.ncon([RMlow.to(global_args.device), vMp, sM_inv_sqrt], [[-1,-2,1,2], [3,1,2], [3,-3]]);
-        else:
-            PM_inv = yastn.ncon([RMlow, vMp, sM_inv_sqrt], [[-1,-2,1,2], [3,1,2], [3,-3]]);
+        PM_inv = yastn.ncon([RMlow, vMp, sM_inv_sqrt], [[-1,-2,1,2], [3,1,2], [3,-3]]);
 
         
         # PM=sM_inv_sqrt*uM'*RMup;
         #PM=permute(PM,(2,3,),(1,));
         uMp=uM.conj();
-        if ctm_setting.doublelayer_on_cpu:#send back to gpu 
-            PM = yastn.ncon([sM_inv_sqrt, uMp, RMup.to(global_args.device)], [[-3,3], [1,2,3], [1,2,-1,-2]]);
-        else:
-            PM = yastn.ncon([sM_inv_sqrt, uMp, RMup], [[-3,3], [1,2,3], [1,2,-1,-2]]);
-
+        PM = yastn.ncon([sM_inv_sqrt, uMp, RMup], [[-3,3], [1,2,3], [1,2,-1,-2]]);
         
 
         Pos=convert_cell_posit(coord[1-1],coord[2-1],0,2,direction, Lx,Ly);
@@ -846,10 +642,9 @@ def ctm_update_single_cx(cx,cy_max, Cset_cell, Tset_cell, double_B_cell,double_T
 
     for cy in range(1,cy_max+1):
         coord=[cx,cy];
-        #PM_cell, PM_inv_cell, M1tem_cell, M5tem_cell, M7tem_cell=checkpoint(prepare_update, Cset_cell, Tset_cell, double_B_cell,double_T_cell, PM_cell, PM_inv_cell, M1tem_cell, M5tem_cell, M7tem_cell, coord,direction,Lx,Ly, use_reentrant=False);
-        
+
         Pos=convert_cell_posit(coord[1-1],coord[2-1],1,2,direction, Lx,Ly);
-        AA=get_AA_direction(double_B_cell,double_T_cell,direction,Pos, ctm_setting, global_args);
+        AA=get_AA_direction(double_B_cell,double_T_cell,direction,Pos);
         Pos=convert_cell_posit(coord[1-1],coord[2-1],0,2,direction, Lx,Ly);
         T4=Tset_cell[str(Pos[1-1])+','+str(Pos[2-1])]['T'+str(mod1(direction-1,4))];
         Pos=convert_cell_posit(coord[1-1],coord[2-1],1,0,direction, Lx,Ly);
@@ -901,7 +696,7 @@ def ctm_update_single_cx(cx,cy_max, Cset_cell, Tset_cell, double_B_cell,double_T
 
     return Cset_cell,Tset_cell
 
-def CTM_ite_cell_continuous_update(Cset_cell, Tset_cell, double_B_cell,double_T_cell, direction, ctm_setting, global_args):
+def CTM_ite_cell_continuous_update(Cset_cell, Tset_cell, double_B_cell,double_T_cell, chi, direction, ctm_setting, global_args):
     Lx=global_args.Lx;
     Ly=global_args.Ly;
     #println(direction)    
@@ -923,8 +718,8 @@ def CTM_ite_cell_continuous_update(Cset_cell, Tset_cell, double_B_cell,double_T_
     cy_max=cx_cy_matrix[direction-1,2-1];
 
     for cx in range(1,cx_max+1):
-        # Cset_cell,Tset_cell=ctm_update_single_cx(cx,cy_max,Cset_cell, Tset_cell, double_B_cell,double_T_cell, direction, ctm_setting, global_args);
-        Cset_cell,Tset_cell=checkpoint(ctm_update_single_cx, cx,cy_max,Cset_cell, Tset_cell, double_B_cell,double_T_cell, direction, ctm_setting, global_args, use_reentrant=False);
+        # Cset_cell,Tset_cell=ctm_update_single_cx(cx,cy_max,Cset_cell, Tset_cell, double_B_cell,double_T_cell, chi, direction, ctm_setting, global_args);
+        Cset_cell,Tset_cell=checkpoint(ctm_update_single_cx, cx,cy_max,Cset_cell, Tset_cell, double_B_cell,double_T_cell, chi, direction, ctm_setting, global_args, use_reentrant=False);
     return Cset_cell,Tset_cell
 
 
@@ -1019,34 +814,3 @@ def init_CTM_cell(B_set,T_set,ls_ctm_args, global_args):
     return CTM_cell
 # end
 
-
-
-def initial_trivial_ctm(Cset_cell, Tset_cell, ctm_setting, global_args):
-    
-    seed_value=123;
-    numpy.random.seed(seed_value);
-    torch.manual_seed(seed_value);
-    Lx=global_args.Lx;
-    Ly=global_args.Ly;
-    config_Z2=Cset_cell['1,1']['C1'].config;
-    dim_even=5;
-    dim_odd=5;
-    for cx in range(1,Lx+1):
-        for cy in range(1,Ly+1):
-            for direction in [1,2,3,4]:
-                C_=Cset_cell[str(cx)+','+str(cy)]['C'+str(direction)];
-                Legs=C_.get_legs();
-                leg1=yastn.Leg(config_Z2, s=Legs[1-1].s, t=(0, 1), D=(dim_even, dim_odd));
-                leg2=yastn.Leg(config_Z2, s=Legs[2-1].s, t=(0, 1), D=(dim_even, dim_odd));
-                C_=yastn.rand(config=config_Z2, legs=[leg1, leg2])
-                Cset_cell[str(cx)+','+str(cy)]['C'+str(direction)]=C_;
-
-                T_=Tset_cell[str(cx)+','+str(cy)]['T'+str(direction)];
-                Legs=T_.get_legs();
-                leg1=yastn.Leg(config_Z2, s=Legs[1-1].s, t=(0, 1), D=(dim_even, dim_odd));
-                leg2=Legs[2-1];
-                leg3=yastn.Leg(config_Z2, s=Legs[3-1].s, t=(0, 1), D=(dim_even, dim_odd));
-                T_=yastn.rand(config=config_Z2, legs=[leg1, leg2, leg3])
-                Tset_cell[str(cx)+','+str(cy)]['T'+str(direction)]=T_;
-    
-    return Cset_cell,Tset_cell

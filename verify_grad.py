@@ -1,6 +1,4 @@
 import os
-os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"  # Must be set BEFORE importing torch
-print("PYTORCH_CUDA_ALLOC_CONF:", os.environ.get("PYTORCH_CUDA_ALLOC_CONF"))
 import sys
 sys.path.append('D:/My Documents/Code/python_codes/iPEPS_Z2')
 from collections import OrderedDict
@@ -33,15 +31,15 @@ Ly=6;
 D=4;
 chi=40;
 
-
+global_args= GLOBALARGS()
+global_args.Lx=Lx;
+global_args.Ly=Ly;
 
 ls_ctm_args= CTMARGS()
 ls_ctm_args.CTM_ite_info=True
 ls_ctm_args.chi=chi;
-ls_ctm_args.CTM_ite_nums=10;
-ls_ctm_args.CTM_trun_tol=1e-8;
-ls_ctm_args.doublelayer_on_cpu=False;
-ls_ctm_args.use_sub_checkpoint=False;
+ls_ctm_args.CTM_ite_nums=1;
+ls_ctm_args.CTM_trun_tol=1e-8
 print(ls_ctm_args, flush=True)
 
 opt_args= OPTARGS()
@@ -51,18 +49,13 @@ init=INITCTMARGS()
 
 # config_kwargs = {"backend": "np"}
 #device: 'cpu', 'cuda'
-config_kwargs = {"backend": 'torch', "default_dtype": 'complex128', 'default_device': 'cuda', 'Lx':Lx, 'Ly':Ly}
-
-global_args= GLOBALARGS()
-global_args.Lx=Lx;
-global_args.Ly=Ly;
-global_args.device=config_kwargs['default_device'];
+config_kwargs = {"backend": 'torch', "default_dtype": 'complex128', 'default_device': 'cpu', 'Lx':Lx, 'Ly':Ly}
 
 filenm='Z2_D4_chi40'
 B_set,T_set=load_triangle_iPESS(filenm,config_kwargs);
 state=IPESS_TRIANGLE(B_set,T_set,config_kwargs)
 state.require_grad(False)
-state.to_device(global_args.device)
+state.to_device('cpu')
 state.normalize()
 # state.require_grad(True)
 
@@ -91,11 +84,9 @@ def cost_fun(state, ls_ctm_args, energy_setting, global_args, config_kwargs):
 
     CTM0=None;
     CTM_cell, double_B_set,double_T_set,ite_num,ite_err=Fermionic_CTMRG_cell_iPESS(B_set,T_set,init,CTM0, ls_ctm_args, global_args);
-    if (ls_ctm_args.doublelayer_on_cpu)&(global_args.device !=double_B_set['1,1'].device) :
-        double_B_set=Cell_to_device(double_B_set,global_args.device,global_args);
-        double_T_set=Cell_to_device(double_T_set,global_args.device,global_args);
+
     E_total,  ex_set, ey_set, e_diagonala_set, e0_set, eU_set=evaluate_ob_cell_iPESS(parameters, B_set,T_set, double_B_set, double_T_set, CTM_cell, energy_setting, config_kwargs, global_args);
-    print(E_total)
+    # print(E_total)
     # print(ex_set)
     # print(ey_set)
     # print(e_diagonala_set)
@@ -147,7 +138,7 @@ def finite_diff(state, ls_ctm_args, energy_setting, global_args, config_kwargs):
         print(grad_[cc].item())
     print(grad_)
     
-# finite_diff(state, ls_ctm_args, energy_setting, global_args, config_kwargs)
+finite_diff(state, ls_ctm_args, energy_setting, global_args, config_kwargs)
 
 # sx_set,sy_set,sz_set=evaluate_spin_cell_iPESS(B_set,T_set, double_B_set, double_T_set, CTM_cell, config_kwargs, global_args);
 # print(sx_set)

@@ -96,9 +96,6 @@ class CTMARGS():
         self.svd_lanczos_tol = 1e-10
         self.CTM_ite_info = False
         self.construct_double_layer=True;
-        self.doublelayer_on_cpu=False;
-        self.trivial_initial_CTM=False;
-        self.use_sub_checkpoint=False;
 
 
     def __str__(self):
