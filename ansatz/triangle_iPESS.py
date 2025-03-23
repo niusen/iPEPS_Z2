@@ -4,6 +4,7 @@ import json
 from collections import OrderedDict
 import json
 import yastn
+import copy
 
 class IPESS_TRIANGLE():
     def __init__(self, B_set, T_set, global_args):
@@ -305,3 +306,28 @@ def Cell_detach(A_set,global_args):
         for cy in range(1,global_args.Ly+1):
             A_set[str(cx)+','+str(cy)]=A_set[str(cx)+','+str(cy)].detach()
     return A_set
+
+
+
+
+def add_noise(state,noise,config_kwargs):
+    config_Z2 = yastn.make_config(sym='Z2',fermionic=True, **config_kwargs);
+    Lx=config_kwargs['Lx'];
+    Ly=config_kwargs['Ly'];
+    for cx in range(1,Lx+1):
+        for cy in range(1,Ly+1):
+            tt=state.B_set[str(cx)+","+str(cy)];
+            tt_new=yastn.rand(config=config_Z2, legs=tt.get_legs());
+            norm0=yastn.linalg.norm(tt);
+            norm1=yastn.linalg.norm(tt_new);
+            tt_=tt+tt_new/norm1*norm0*noise;
+            state.B_set[str(cx)+","+str(cy)]=tt_;
+    
+            tt=state.T_set[str(cx)+","+str(cy)];
+            tt_new=yastn.rand(config=config_Z2, legs=tt.get_legs());
+            norm0=yastn.linalg.norm(tt);
+            norm1=yastn.linalg.norm(tt_new);
+            tt_=tt+tt_new/norm1*norm0*noise;
+            state.T_set[str(cx)+","+str(cy)]=tt_;
+            
+    return state

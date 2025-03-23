@@ -6,38 +6,71 @@ import json
 import numpy
 import torch
 import yastn
+from config.settings import *
+from config.config import *
 from ansatz.triangle_iPESS import *
+from ctmrg.Fermionic_CTMRG_unitcell_iPESS import *
+from model.fermion_ob_iPESS import *
+from optimization.stochastic_opt import *
 
+########################
+pid = os.getpid();
+print('pid= '+str(pid))
+n_cpu=10;
+torch.set_num_threads(n_cpu)
+########################
+t1=1;
+t2=1;
+ϕ=numpy.pi/2;
+μ=0;
+U=20;
+B=0;
+parameters={"t1": t1, "t2": t2, "ϕ": ϕ, "μ":  μ, "U":  U, "B":  B};
+print(parameters)
+energy_setting=Square_Hubbard_Energy_settings();
+energy_setting.model = 'spinful_triangle_lattice';
+
+Lx=6;
+Ly=6;
+D=4;
+chi=40;
+
+global_args= GLOBALARGS()
+global_args.Lx=Lx;
+global_args.Ly=Ly;
+
+AD_ctm_args= CTMARGS()
+AD_ctm_args.CTM_ite_info=True
+AD_ctm_args.chi=chi;
+AD_ctm_args.CTM_ite_nums=10;
+AD_ctm_args.CTM_trun_tol=1e-8
+print(AD_ctm_args)
+
+ls_ctm_args= CTMARGS()
+ls_ctm_args.CTM_ite_info=False
+ls_ctm_args.chi=chi;
+ls_ctm_args.CTM_ite_nums=10;
+ls_ctm_args.CTM_trun_tol=1e-8
+print(ls_ctm_args)
+
+opt_args= OPTARGS()
+
+init=INITCTMARGS()
 
 
 # config_kwargs = {"backend": "np"}
 #device: 'cpu', 'cuda'
-config_kwargs = {"backend": "torch", "default_dtype": 'complex128', 'default_device': 'cuda', 'Lx':6, 'Ly':6}
+config_kwargs = {"backend": 'torch', "default_dtype": 'complex128', 'default_device': 'cuda', 'Lx':Lx, 'Ly':Ly}
 
-filenm='SU_iPESS_Z2_D4'
+filenm='SU_iPESS_Z2_csl_D'+str(D);
 B_set,T_set=load_triangle_iPESS(filenm,config_kwargs);
 state=IPESS_TRIANGLE(B_set,T_set,config_kwargs)
 state.require_grad(False)
-state.to_device('cuda')
+state.to_device(config_kwargs['default_device'])
+
+noise=0;
+state=add_noise(state,noise,config_kwargs)
+
 state.normalize()
-state.require_grad(True)
-
-
-
-tt=B_set['1,1']
-print(tt[0,1,1])
-tt1=yastn.swap_gate(tt, (1,1))
-print(tt1[0,1,1])
-tt2=tt.conj()
-print(tt2[0,1,1])
-
-tt=tt.fuse_legs((0,(1,2)), mode='hard')
-tt=tt.fuse_legs((0,(1,2)), mode='meta')
-
-
-
-
-
-
-        
+# state.require_grad(True)
 
