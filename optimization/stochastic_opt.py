@@ -117,6 +117,12 @@ def fx(parameters,state, CTM0, ls_ctm_args, energy_setting, global_args, config_
     print(e0_set.tolist())
     print(eU_set.tolist())
 
+    print('pairing:')
+    pairing_x_set,pairing_y_set,pairing_diagonal_set=evaluate_ob_pairing_cell(B_set,T_set, double_B_set, double_T_set, CTM_cell, config_kwargs, global_args);
+    print(pairing_x_set)
+    print(pairing_y_set)
+    print(pairing_diagonal_set)
+
     print('magnetization:')
     sx_set,sy_set,sz_set=evaluate_spin_cell_iPESS(B_set,T_set, double_B_set, double_T_set, CTM_cell, config_kwargs, global_args);
     print(sx_set.tolist())

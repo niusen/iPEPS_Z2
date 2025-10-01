@@ -304,6 +304,81 @@ def Operators_spinful_Z2(config_kwargs):
 
 
 
+
+
+def twosite_pairing_spinful_Z2(config_kwargs):#superconductivity order parameter
+    config_Z2 = yastn.make_config(sym='Z2',fermionic=True, **config_kwargs)
+    Device=config_kwargs['default_device'];
+
+    Vp = yastn.Leg(config_Z2, s=1, t=(0, 1), D=(2, 2))
+    Vp_conj = yastn.Leg(config_Z2, s=-1, t=(0, 1), D=(2, 2))
+    Vdummy = yastn.Leg(config_Z2, s=-1, t=[1], D=[2])
+    Vdummy_conj = yastn.Leg(config_Z2, s=1, t=[1], D=[2])
+
+    #order of kron() command: (0,0), (0,1), (1,0), (1,1)
+    order=(1-1,4-1,3-1,2-1);
+    
+    Id=torch.tensor([[1.0, 0], [0, 1.0]]).to(device=Device);
+    sm=torch.tensor([[0, 1.0], [0, 0]]).to(device=Device); 
+    sp=torch.tensor([[0, 0], [1.0, 0]]).to(device=Device);
+    sz=torch.tensor([[1.0, 0], [0, -1.0]]).to(device=Device); 
+    occu=torch.tensor([[0, 0], [0, 1.0]]).to(device=Device);
+
+    Cdagup=torch.zeros((4,4,2),dtype=Id.dtype,device=Id.device);
+    Cdagup[:,:,0]=torch.kron(sp,Id);
+    Cdagdn=torch.zeros((4,4,2),dtype=Id.dtype,device=Id.device);
+    Cdagdn[:,:,1]=torch.kron(sz,sp);
+    Cdaga=Cdagup+Cdagdn
+    Cdaga=Cdaga[order,:,:]
+    Cdaga=Cdaga[:,order,:]
+    Cdaga_empty=yastn.zeros(config=config_Z2, legs=[Vp,Vp_conj,Vdummy])
+    Cdaga=fill_Z2_Ham(Cdaga,Cdaga_empty)
+    Cdaga=yastn.transpose(Cdaga,axes=(2,0,1))
+
+    Cdagup=torch.zeros((2,4,4),dtype=Id.dtype,device=Id.device);
+    Cdagup[1,:,:]=torch.kron(sp,Id);
+    Cdagdn=torch.zeros((2,4,4),dtype=Id.dtype,device=Id.device);
+    Cdagdn[0,:,:]=torch.kron(sz,sp);
+    Cdagb=Cdagup-Cdagdn;
+    Cdagb=Cdagb[:,order,:]
+    Cdagb=Cdagb[:,:,order]
+    Cdagb_empty=yastn.zeros(config=config_Z2, legs=[Vdummy_conj, Vp,Vp_conj])
+    Cdagb=fill_Z2_Ham(Cdagb,Cdagb_empty)
+
+
+
+    # # singlet pairing
+    # Cdagupa=zeros(4,4,2);
+    # Cdagupa[[1,4,3,2],[1,4,3,2],1]=kron(sp,Id);
+    # Cdagdna=zeros(4,4,2);
+    # Cdagdna[[1,4,3,2],[1,4,3,2],2]=kron(sz,sp);
+    # Cdaga=TensorMap(Cdagupa+Cdagdna,  V ← V ⊗Vdummy);
+    # Cdaga=permute(Cdaga,(3,1,),(2,))
+
+    # Cdagupb=zeros(2,4,4);
+    # Cdagupb[2,[1,4,3,2],[1,4,3,2]]=kron(sp,Id);
+    # Cdagdnb=zeros(2,4,4);
+    # Cdagdnb[1,[1,4,3,2],[1,4,3,2]]=kron(sz,sp);
+    # Cdagb=TensorMap(Cdagupb-Cdagdnb, Vdummy ⊗ V ← V);
+
+
+
+    # @tensor pairing[:]:=Cdaga[1,-1,-3]*Cdagb[1,-2,-4];
+
+
+    pairing=yastn.ncon([Cdaga,Cdagb], [[1,-1,-3], [1,-2,-4]]);
+
+    pairing_singlet_site1=Cdaga;
+    pairing_singlet_site2=Cdagb;
+
+    pairing_string = yastn.eye(config=config_Z2,legs=Cdagb.get_legs(axes=1-1), isdiag=False)
+
+
+    return pairing_singlet_site1, pairing_singlet_site2, pairing_string
+
+
+
+
 def build_MM_LU(Cset,Tset,AA_LU_,cx,cy,Lx,Ly):
     #@tensor MM_LU[:]:=Cset[mod1(cx,Lx)][mod1(cy,Ly)].C1[1,2]*Tset[mod1(cx+1,Lx)][mod1(cy,Ly)].T1[2,3,-3]*Tset[mod1(cx,Lx)][mod1(cy+1,Ly)].T4[-1,4,1]*AA_LU_[4,-2,-4,3]; 
     # MM_LU=permute(MM_LU,(1,2,),(3,4,));
@@ -1265,5 +1340,39 @@ def evaluate_spin_ob_cell_iPESS(B_set,T_set, double_B_set, double_T_set, CTM_cel
 
 
         return triangle_up_set,triangle_dn_set,SS_x_set,SS_y_set,SS_diagonal_set
+    
+
+
+def evaluate_ob_pairing_cell(B_set,T_set, double_B_set, double_T_set, CTM_cell, config_kwargs, global_args):
+    """change of coordinate 
+    (1,1)  (2,1)
+    (1,2)  (2,2)
+
+    coordinate of C1 tensor: (cx,cy)
+    """    
+    Lx=global_args.Lx
+    Ly=global_args.Ly
+    with torch.no_grad():
+        pairing_singlet_site1, pairing_singlet_site2, pairing_string=twosite_pairing_spinful_Z2(config_kwargs);
+
+        pairing_x_set=torch.zeros(Lx,Ly)*1j;
+        pairing_y_set=torch.zeros(Lx,Ly)*1j;
+        pairing_diagonal_set=torch.zeros(Lx,Ly)*1j;
+
+
+        for cx in range(1,Lx+1):
+            for cy in range(1,Ly+1):
+
+                #expectation value for Heisenberg operator
+                pairing_x=hopping_x_iPESS(CTM_cell, pairing_singlet_site1, pairing_singlet_site2, pairing_string, B_set,T_set, double_B_set, double_T_set,cx,cy,Lx,Ly);
+                pairing_y=hopping_y_iPESS(CTM_cell, pairing_singlet_site1, pairing_singlet_site2, pairing_string, B_set,T_set, double_B_set, double_T_set,cx,cy,Lx,Ly);
+                pairing_diagonal=hopping_diagonala_iPESS(CTM_cell, pairing_singlet_site1, pairing_singlet_site2, pairing_string, B_set,T_set, double_B_set, double_T_set,cx,cy,Lx,Ly);
+
+                pairing_x_set[cx-1,cy-1]=pairing_x;
+                pairing_y_set[cx-1,cy-1]=pairing_y;
+                pairing_diagonal_set[cx-1,cy-1]=pairing_diagonal;
+
+
+        return pairing_x_set,pairing_y_set,pairing_diagonal_set
     
 
