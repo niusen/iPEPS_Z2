@@ -30,6 +30,9 @@ print(parameters)
 energy_setting=Square_Hubbard_Energy_settings();
 energy_setting.model = 'spinful_triangle_lattice';
 
+Noise=0.0;
+print(Noise);
+
 Lx=6;
 Ly=6;
 D=4;
@@ -65,6 +68,9 @@ config_kwargs = {"backend": 'torch', "default_dtype": 'complex128', 'default_dev
 filenm='SU_iPESS_Z2_csl_D'+str(D);
 B_set,T_set=load_triangle_iPESS(filenm,config_kwargs);
 state=IPESS_TRIANGLE(B_set,T_set,config_kwargs)
+
+state=add_noise(state,Noise,config_kwargs);
+
 state.require_grad(False)
 state.to_device(config_kwargs['default_device'])
 state.normalize()
