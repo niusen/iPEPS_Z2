@@ -99,6 +99,7 @@ class CTMARGS():
         self.doublelayer_on_cpu=False;
         self.trivial_initial_CTM=False;
         self.use_sub_checkpoint=False;
+        self.svd_on_cpu=False;
 
 
     def __str__(self):
