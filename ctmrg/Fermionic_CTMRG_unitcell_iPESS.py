@@ -792,8 +792,8 @@ def ctm_update_single_cx(cx,cy_max, Cset_cell, Tset_cell, double_B_cell,double_T
 
 
         # uM,sM,vM = yastn.linalg.svd_with_truncation(M, axes=((0, 1), (2, 3)), D_total=chi+chi_extra,svd_on_cpu=True, truncate_multiplets=True, tol=ctm_setting.CTM_trun_tol);
-        
-        uM,sM,vM = yastn.linalg.svd_with_truncation(M, axes=((0, 1), (2, 3)), D_total=chi+chi_extra, svd_on_cpu=ctm_setting.svd_on_cpu, tol=ctm_setting.CTM_trun_tol, mask_f=truncation_f);
+
+        uM,sM,vM = yastn.linalg.svd_with_truncation(M.to(global_args.device), axes=((0, 1), (2, 3)), D_total=chi+chi_extra, svd_on_cpu=ctm_setting.svd_on_cpu, tol=ctm_setting.CTM_trun_tol, mask_f=truncation_f);
         if ctm_setting.doublelayer_on_cpu:#send back to gpu 
             uM=uM.to(global_args.device);
             sM=sM.to(global_args.device);
