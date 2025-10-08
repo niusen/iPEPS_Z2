@@ -1,6 +1,8 @@
 import os
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"  # Must be set BEFORE importing torch
+print("PYTORCH_CUDA_ALLOC_CONF:", os.environ.get("PYTORCH_CUDA_ALLOC_CONF"))
 import sys
-sys.path.append('D:/My Documents/Code/python_codes/iPEPS_Z2')
+sys.path.append('/home/sniu/python_code/iPEPS_Z2/')
 from collections import OrderedDict
 import json
 import numpy
@@ -16,43 +18,43 @@ from optimization.stochastic_opt import *
 ########################
 pid = os.getpid();
 print('pid= '+str(pid))
-n_cpu=10;
+n_cpu=20;
 torch.set_num_threads(n_cpu)
 ########################
 t1=1;
 t2=1;
 ϕ=numpy.pi/2;
 μ=0;
-U=20;
+U=9;
 B=0;
 parameters={"t1": t1, "t2": t2, "ϕ": ϕ, "μ":  μ, "U":  U, "B":  B};
 print(parameters)
 energy_setting=Square_Hubbard_Energy_settings();
 energy_setting.model = 'spinful_triangle_lattice';
 
-Noise=0.0;
+Noise=0;
 print(Noise);
 
-Lx=6;
-Ly=6;
-D=4;
-chi=40;
+Lx=2;
+Ly=2;
+D=8;
+chi=80;
 
-global_args= GLOBALARGS()
-global_args.Lx=Lx;
-global_args.Ly=Ly;
+
 
 AD_ctm_args= CTMARGS()
 AD_ctm_args.CTM_ite_info=True
 AD_ctm_args.chi=chi;
 AD_ctm_args.CTM_ite_nums=10;
 AD_ctm_args.CTM_trun_tol=1e-8
+AD_ctm_args.doublelayer_on_cpu=True;
+AD_ctm_args.use_sub_checkpoint=True;
 print(AD_ctm_args)
 
 ls_ctm_args= CTMARGS()
 ls_ctm_args.CTM_ite_info=False
 ls_ctm_args.chi=chi;
-ls_ctm_args.CTM_ite_nums=10;
+ls_ctm_args.CTM_ite_nums=50;
 ls_ctm_args.CTM_trun_tol=1e-8
 print(ls_ctm_args)
 
@@ -63,9 +65,15 @@ init=INITCTMARGS()
 
 # config_kwargs = {"backend": "np"}
 #device: 'cpu', 'cuda'
-config_kwargs = {"backend": 'torch', "default_dtype": 'complex128', 'default_device': 'cuda', 'Lx':Lx, 'Ly':Ly}
+config_kwargs = {"backend": 'torch', "default_dtype": 'complex128', 'default_device': 'cuda:1', 'Lx':Lx, 'Ly':Ly}
 
-filenm='SU_iPESS_Z2_csl_D'+str(D);
+global_args= GLOBALARGS()
+global_args.Lx=Lx;
+global_args.Ly=Ly;
+global_args.device=config_kwargs['default_device'];
+
+#filenm='SU_iPESS_Z2_csl_D'+str(D);
+filenm='Z2_D8_chi80_3.45158'
 B_set,T_set=load_triangle_iPESS(filenm,config_kwargs);
 state=IPESS_TRIANGLE(B_set,T_set,config_kwargs)
 
@@ -110,6 +118,7 @@ print(B_set['1,1'].requires_grad)
 # print(SS_x_set)
 # print(SS_y_set)
 # print(SS_diagonal_set)
+
 
 
 
