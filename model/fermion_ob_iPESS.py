@@ -1217,6 +1217,20 @@ def evaluate_ob_cell_iPESS(parameters, B_set,T_set, double_B_set, double_T_set, 
                 else:
                     E_total=E_total+torch.real(t1*(cmath.exp(1j*ϕ)*ex)*2+t1*(ey)*2+t2*(e_diagonala)*2 -μ*e0 +U*eU);
 
+
+        E_Bz=(torch.zeros(1,1)*1j).to(E_total.device);
+        if 'Bz' in parameters:
+            if abs(parameters['Bz'])>0:
+                Bz=parameters['Bz'];
+                sx_op,sy_op,sz_op=spin_operator_Z2(config_kwargs);
+                for cx in range(1,Lx+1):
+                    for cy in range(1,Ly+1):
+                        e_sz=checkpoint(ob_onsite_iPESS, CTM_cell, sz_op, B_set,T_set, double_B_set, double_T_set,cx,cy,Lx,Ly, use_reentrant=False);
+                        
+                        E_total=E_total+Bz*e_sz;
+                        E_Bz=E_Bz+Bz*e_sz;
+        # print('Bz energy:')
+        # print(E_Bz)
         E_total=E_total/(Lx*Ly);
         return torch.real(E_total),  ex_set, ey_set, e_diagonala_set, e0_set, eU_set
     
