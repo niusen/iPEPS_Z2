@@ -108,7 +108,7 @@ with torch.no_grad():
         print(SS_diagonal_set)
 
         mat_filenm="ob_D"+str(D)+"_chi"+str(chi);
-        datadic = {"E_total": E_total.item(), "ex_set": ex_set.cpu().numpy(), "ey_set": ey_set.cpu().numpy(), "e_diagonala_set":e_diagonala_set.cpu().numpy(), "pairing_x_set":pairing_x_set.cpu().numpy(), "pairing_y_set":pairing_y_set.cpu().numpy(), "pairing_diagonal_set":pairing_diagonal_set.cpu().numpy(),  "sx_set": sx_set.cpu().numpy(), "sy_set": sy_set.cpu().numpy(), "sz_set":sz_set.cpu().numpy(), "triangle_up_set":triangle_up_set.cpu().numpy(), "triangle_dn_set":triangle_dn_set.cpu().numpy(), "SS_x_set":SS_x_set.cpu().numpy(), "SS_y_set":SS_y_set.cpu().numpy(),"SS_diagonal_set":SS_diagonal_set.cpu().numpy() }
+        datadic = {"E_total": E_total.item(), "e0_set": e0_set.cpu().numpy(), "eU_set": eU_set.cpu().numpy(), "ex_set": ex_set.cpu().numpy(), "ey_set": ey_set.cpu().numpy(), "e_diagonala_set":e_diagonala_set.cpu().numpy(), "pairing_x_set":pairing_x_set.cpu().numpy(), "pairing_y_set":pairing_y_set.cpu().numpy(), "pairing_diagonal_set":pairing_diagonal_set.cpu().numpy(),  "sx_set": sx_set.cpu().numpy(), "sy_set": sy_set.cpu().numpy(), "sz_set":sz_set.cpu().numpy(), "triangle_up_set":triangle_up_set.cpu().numpy(), "triangle_dn_set":triangle_dn_set.cpu().numpy(), "SS_x_set":SS_x_set.cpu().numpy(), "SS_y_set":SS_y_set.cpu().numpy(),"SS_diagonal_set":SS_diagonal_set.cpu().numpy() }
         savemat(mat_filenm+".mat", datadic)
 
 
