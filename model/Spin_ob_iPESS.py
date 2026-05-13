@@ -159,70 +159,6 @@ def Hamiltonians_spinful_Z2(config_kwargs):
     CdagC_string = yastn.eye(config=config_Z2,legs=C_.get_legs(axes=1-1), isdiag=False)
     return Ident_, N_occu_, n_double_, Cdag_, C_, CdagC_string
 
-def hopping_spin_resolved_Z2(config_kwargs):
-    config_Z2 = yastn.make_config(sym='Z2',fermionic=True, **config_kwargs)
-    Device=config_kwargs['default_device'];
-
-    Vp = yastn.Leg(config_Z2, s=1, t=(0, 1), D=(2, 2))
-    Vp_conj = yastn.Leg(config_Z2, s=-1, t=(0, 1), D=(2, 2))
-    Vdummy = yastn.Leg(config_Z2, s=-1, t=[1], D=[2])
-    Vdummy_conj = yastn.Leg(config_Z2, s=1, t=[1], D=[2])
-
-    Id=torch.tensor([[1.0, 0], [0, 1.0]]).to(device=Device);
-    sm=torch.tensor([[0, 1.0], [0, 0]]).to(device=Device); 
-    sp=torch.tensor([[0, 0], [1.0, 0]]).to(device=Device);
-    sz=torch.tensor([[1.0, 0], [0, -1.0]]).to(device=Device); 
-    occu=torch.tensor([[0, 0], [0, 1.0]]).to(device=Device);
-    
-    #order of kron() command: (0,0), (0,1), (1,0), (1,1)
-    order=(1-1,4-1,3-1,2-1);
-
-    Ident=torch.kron(Id,Id);
-    Ident=Ident[order,:];
-    Ident=Ident[:,order];
-    Ident_=yastn.zeros(config=config_Z2, legs=[Vp,Vp_conj])
-    Ident_=fill_Z2_Ham(Ident,Ident_)
-
-    Cdagup=torch.zeros((4,4,2),dtype=Id.dtype,device=Id.device);
-    Cdagup[:,:,0]=torch.kron(sp,Id);
-
-    Cdagdn=torch.zeros((4,4,2),dtype=Id.dtype,device=Id.device);
-    Cdagdn[:,:,1]=torch.kron(sz,sp);
-
-
-    Cdagup=Cdagup[order,:,:]
-    Cdagup=Cdagup[:,order,:]
-    Cdagup_=yastn.zeros(config=config_Z2, legs=[Vp,Vp_conj,Vdummy])
-    Cdagup_=fill_Z2_Ham(Cdagup,Cdagup_)
-    Cdagup_=yastn.transpose(Cdagup_,axes=(2,0,1))
-
-    Cdagdn=Cdagdn[order,:,:]
-    Cdagdn=Cdagdn[:,order,:]
-    Cdagdn_=yastn.zeros(config=config_Z2, legs=[Vp,Vp_conj,Vdummy])
-    Cdagdn_=fill_Z2_Ham(Cdagdn,Cdagdn_)
-    Cdagdn_=yastn.transpose(Cdagdn_,axes=(2,0,1))
-
-    Cup=torch.zeros((2,4,4),dtype=Id.dtype,device=Id.device);
-    Cup[0,:,:]=torch.kron(sm,Id);
-
-    Cdn=torch.zeros((2,4,4),dtype=Id.dtype,device=Id.device);
-    Cdn[1,:,:]=torch.kron(sz,sm);
-
-    Cup=Cup[:,order,:]
-    Cup=Cup[:,:,order]
-    Cup_=yastn.zeros(config=config_Z2, legs=[Vdummy_conj, Vp,Vp_conj])
-    Cup_=fill_Z2_Ham(Cup,Cup_)
-
-    Cdn=Cdn[:,order,:]
-    Cdn=Cdn[:,:,order]
-    Cdn_=yastn.zeros(config=config_Z2, legs=[Vdummy_conj, Vp,Vp_conj])
-    Cdn_=fill_Z2_Ham(Cdn,Cdn_)
- 
-   
-    CdagC_up_string = yastn.eye(config=config_Z2,legs=Cup_.get_legs(axes=1-1), isdiag=False)
-    CdagC_dn_string = yastn.eye(config=config_Z2,legs=Cdn_.get_legs(axes=1-1), isdiag=False)
-    return  Cdagup_, Cup_, CdagC_up_string, Cdagdn_, Cdn_, CdagC_dn_string
-
 
 def spin_operator_Z2(config_kwargs):
     
@@ -1297,74 +1233,7 @@ def evaluate_ob_cell_iPESS(parameters, B_set,T_set, double_B_set, double_T_set, 
         # print(E_Bz)
         E_total=E_total/(Lx*Ly);
         return torch.real(E_total),  ex_set, ey_set, e_diagonala_set, e0_set, eU_set
-    elif energy_setting.model=="triangle_spinHall":
-
-        Cdagup_, Cup_, CdagC_up_string, Cdagdn_, Cdn_, CdagC_dn_string = hopping_spin_resolved_Z2(config_kwargs);
-        sx_op,sy_op,sz_op=spin_operator_Z2(config_kwargs);
-        assert mod(Lx,2)==0
-        #for 120 degree magnetic order in the Hofstadter M2 model. Unit-cell for 120 degree order should be at least 3x3. 
-
-        t1=parameters['t1'];
-        t2=parameters['t2'];
-        ϕ=parameters['ϕ'];
-        μ=parameters['μ'];
-        U=parameters['U'];
-        mx=parameters['mx'];
-
-        with torch.no_grad():
-            ex_up_set=torch.zeros(Lx,Ly)*1j;
-            ey_up_set=torch.zeros(Lx,Ly)*1j;
-            e_diagonala_up_set=torch.zeros(Lx,Ly)*1j;
-            ex_dn_set=torch.zeros(Lx,Ly)*1j;
-            ey_dn_set=torch.zeros(Lx,Ly)*1j;
-            e_diagonala_dn_set=torch.zeros(Lx,Ly)*1j;
-            e0_set=torch.zeros(Lx,Ly)*1j;
-            eU_set=torch.zeros(Lx,Ly)*1j;
-        
-            sx_set=torch.zeros(Lx,Ly)*1j;
-            sy_set=torch.zeros(Lx,Ly)*1j;
-            sz_set=torch.zeros(Lx,Ly)*1j;
-
-        
-        # E_total=0;
-        E_total=torch.zeros((1), dtype=B_set['1,1'].dtype,device=B_set['1,1'].device,requires_grad=True);
-        for cx in range(1,Lx+1):
-            for cy in range(1,Ly+1):
-
-                ex_up=checkpoint(hopping_x_iPESS, CTM_cell, Cdagup_, Cup_, CdagC_up_string, B_set,T_set, double_B_set, double_T_set,cx,cy,Lx,Ly, use_reentrant=False);
-                ey_up=checkpoint(hopping_y_iPESS, CTM_cell, Cdagup_, Cup_, CdagC_up_string, B_set,T_set, double_B_set, double_T_set,cx,cy,Lx,Ly, use_reentrant=False);
-                e_diagonala_up=checkpoint(hopping_diagonala_iPESS, CTM_cell, Cdagup_, Cup_, CdagC_up_string, B_set,T_set, double_B_set, double_T_set,cx,cy,Lx,Ly, use_reentrant=False);
-                ex_dn=checkpoint(hopping_x_iPESS, CTM_cell, Cdagdn_, Cdn_, CdagC_dn_string, B_set,T_set, double_B_set, double_T_set,cx,cy,Lx,Ly, use_reentrant=False);
-                ey_dn=checkpoint(hopping_y_iPESS, CTM_cell, Cdagdn_, Cdn_, CdagC_dn_string, B_set,T_set, double_B_set, double_T_set,cx,cy,Lx,Ly, use_reentrant=False);
-                e_diagonala_dn=checkpoint(hopping_diagonala_iPESS, CTM_cell, Cdagdn_, Cdn_, CdagC_dn_string, B_set,T_set, double_B_set, double_T_set,cx,cy,Lx,Ly, use_reentrant=False);
-                e0=checkpoint(ob_onsite_iPESS, CTM_cell,N_occu, B_set,T_set, double_B_set, double_T_set,cx,cy,Lx,Ly, use_reentrant=False);
-                eU=checkpoint(ob_onsite_iPESS, CTM_cell,n_double-(1/2)*N_occu+(1/4)*Ident,B_set,T_set, double_B_set, double_T_set,cx,cy,Lx,Ly, use_reentrant=False);
-
-                e_sx=checkpoint(ob_onsite_iPESS, CTM_cell, sx_op, B_set,T_set, double_B_set, double_T_set,cx,cy,Lx,Ly, use_reentrant=False);
-                e_sy=checkpoint(ob_onsite_iPESS, CTM_cell, sy_op, B_set,T_set, double_B_set, double_T_set,cx,cy,Lx,Ly, use_reentrant=False);
-                e_sz=checkpoint(ob_onsite_iPESS, CTM_cell, sz_op, B_set,T_set, double_B_set, double_T_set,cx,cy,Lx,Ly, use_reentrant=False);
-                with torch.no_grad():
-                    ex_up_set[cx-1,cy-1]=ex_up;
-                    ey_up_set[cx-1,cy-1]=ey_up;
-                    e_diagonala_up_set[cx-1,cy-1]=e_diagonala_up;
-                    ex_dn_set[cx-1,cy-1]=ex_dn;
-                    ey_dn_set[cx-1,cy-1]=ey_dn;
-                    e_diagonala_dn_set[cx-1,cy-1]=e_diagonala_dn;
-                    e0_set[cx-1,cy-1]=e0;
-                    eU_set[cx-1,cy-1]=eU;
-                    sx_set[cx-1,cy-1]=e_sx;
-                    sy_set[cx-1,cy-1]=e_sy;
-                    sz_set[cx-1,cy-1]=e_sz;
-                
-                if mod(cx,2)==1:
-                    E_total=E_total+torch.real(t1*(cmath.exp(1j*ϕ)*ex_up + cmath.exp(-1j*ϕ)*ex_dn)*2-t1*(ey_up-ey_dn)*2-t2*(e_diagonala_up - e_diagonala_dn)*2 -μ*e0 +U*eU+mx*e_sx);
-                else:
-                    E_total=E_total+torch.real(t1*(cmath.exp(1j*ϕ)*ex_up + cmath.exp(-1j*ϕ)*ex_dn)*2+t1*(ey_up-ey_dn)*2+t2*(e_diagonala_up - e_diagonala_dn)*2 -μ*e0 +U*eU+mx*e_sx);
-
-
-
-        E_total=E_total/(Lx*Ly);
-        return torch.real(E_total),  ex_up_set, ey_up_set, e_diagonala_up_set, ex_dn_set, ey_dn_set, e_diagonala_dn_set, e0_set, eU_set, sx_set, sy_set, sz_set
+    
     elif energy_setting.model =="standard_triangle_Hubbard":    
         t1=parameters['t1'];
         t2=parameters['t2'];

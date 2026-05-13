@@ -60,7 +60,10 @@ def cost_fun(parameters,state, ctm_args, energy_setting, global_args, config_kwa
     if (ctm_args.doublelayer_on_cpu)&(global_args.device !=double_B_set['1,1'].device) :
         double_B_set=Cell_to_device(double_B_set,global_args.device,global_args);
         double_T_set=Cell_to_device(double_T_set,global_args.device,global_args);
-    E_total,  ex_set, ey_set, e_diagonala_set, e0_set, eU_set=evaluate_ob_cell_iPESS(parameters, B_set,T_set, double_B_set, double_T_set, CTM_cell, energy_setting, config_kwargs, global_args);
+    if energy_setting.model=="spinful_triangle_lattice":
+        E_total,  ex_set, ey_set, e_diagonala_set, e0_set, eU_set=evaluate_ob_cell_iPESS(parameters, B_set,T_set, double_B_set, double_T_set, CTM_cell, energy_setting, config_kwargs, global_args);
+    elif energy_setting.model=="triangle_spinHall":
+        E_total,  ex_up_set, ey_up_set, e_diagonala_up_set, ex_dn_set, ey_dn_set, e_diagonala_dn_set, e0_set, eU_set, sx_set, sy_set, sz_set=evaluate_ob_cell_iPESS(parameters, B_set,T_set, double_B_set, double_T_set, CTM_cell, energy_setting, config_kwargs, global_args);
     # print(E_total)
     # print(ex_set)
     # print(ey_set)
@@ -109,27 +112,53 @@ def fx(parameters,state, CTM0, ls_ctm_args, energy_setting, global_args, config_
     CTM_cell, double_B_set,double_T_set,ite_num,ite_err=Fermionic_CTMRG_cell_iPESS(B_set,T_set,init,CTM0, ls_ctm_args, global_args);
     print('CTM ite_num='+str(ite_num)+', ite_err='+str(ite_err))
 
-    E_total,  ex_set, ey_set, e_diagonala_set, e0_set, eU_set=evaluate_ob_cell_iPESS(parameters, B_set,T_set, double_B_set, double_T_set, CTM_cell, energy_setting, config_kwargs, global_args);
-    print('E= '+str(E_total.item()))
-    print(ex_set.tolist())
-    print(ey_set.tolist())
-    print(e_diagonala_set.tolist())
-    print(e0_set.tolist())
-    print(eU_set.tolist())
+    if energy_setting.model=="spinful_triangle_lattice":
+        E_total,  ex_set, ey_set, e_diagonala_set, e0_set, eU_set=evaluate_ob_cell_iPESS(parameters, B_set,T_set, double_B_set, double_T_set, CTM_cell, energy_setting, config_kwargs, global_args);
+        print('E= '+str(E_total.item()))
+        print(ex_set.tolist())
+        print(ey_set.tolist())
+        print(e_diagonala_set.tolist())
+        print(e0_set.tolist())
+        print(eU_set.tolist())
 
-    print('pairing:')
-    pairing_x_set,pairing_y_set,pairing_diagonal_set=evaluate_ob_pairing_cell(B_set,T_set, double_B_set, double_T_set, CTM_cell, config_kwargs, global_args);
-    print(pairing_x_set)
-    print(pairing_y_set)
-    print(pairing_diagonal_set)
+        print('pairing:')
+        pairing_x_set,pairing_y_set,pairing_diagonal_set=evaluate_ob_pairing_cell(B_set,T_set, double_B_set, double_T_set, CTM_cell, config_kwargs, global_args);
+        print(pairing_x_set)
+        print(pairing_y_set)
+        print(pairing_diagonal_set)
 
-    print('magnetization:')
-    sx_set,sy_set,sz_set=evaluate_spin_cell_iPESS(B_set,T_set, double_B_set, double_T_set, CTM_cell, config_kwargs, global_args);
-    print(sx_set.tolist())
-    print(sy_set.tolist())
-    print(sz_set.tolist())
-    S2=torch.sqrt(sx_set**2+sy_set**2+sz_set**2)
-    print(S2.tolist())
+        print('magnetization:')
+        sx_set,sy_set,sz_set=evaluate_spin_cell_iPESS(B_set,T_set, double_B_set, double_T_set, CTM_cell, config_kwargs, global_args);
+        print(sx_set.tolist())
+        print(sy_set.tolist())
+        print(sz_set.tolist())
+        S2=torch.sqrt(sx_set**2+sy_set**2+sz_set**2)
+        print(S2.tolist())
+    elif energy_setting.model=="triangle_spinHall":
+        E_total,  ex_up_set, ey_up_set, e_diagonala_up_set, ex_dn_set, ey_dn_set, e_diagonala_dn_set, e0_set, eU_set, sx_set, sy_set, sz_set=evaluate_ob_cell_iPESS(parameters, B_set,T_set, double_B_set, double_T_set, CTM_cell, energy_setting, config_kwargs, global_args);
+        print('E= '+str(E_total.item()))
+        print('hopping for spin up:')
+        print(ex_up_set.tolist())
+        print(ey_up_set.tolist())
+        print(e_diagonala_up_set.tolist())
+        print('hopping for spin dn:')
+        print(ex_dn_set.tolist())
+        print(ey_dn_set.tolist())
+        print(e_diagonala_dn_set.tolist())
+        print('occupation and interaction:')
+        print(e0_set.tolist())
+        print(eU_set.tolist())
+
+    
+
+        print('magnetization components:')
+
+        print(sx_set.tolist())
+        print(sy_set.tolist())
+        print(sz_set.tolist())
+        print('total magnetization:')
+        S2=torch.sqrt(sx_set**2+sy_set**2+sz_set**2)
+        print(S2.tolist())
     return E_total
 
 
