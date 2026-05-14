@@ -45,10 +45,22 @@ class MAINARGS():
 class LINESEARCH():
 
     def __init__(self):
+        self.method='stochastic'
         self.maxiter=100
         self.gtol=1e-3
-        self.delta0=1e-3
-        self.alpha= 3/4
+        self.step0=1.0
+        self.alpha=0.5
+        self.ls_maxiter=10
+        self.line_search='hager_zhang'
+        self.c1=1e-4
+        self.min_step=1e-12
+        self.history_size=8
+        self.cg_beta='PRP'
+        self.hz_delta=0.1
+        self.hz_sigma=0.9
+        self.hz_epsilon=1e-6
+        self.hz_expand=2.0
+        self.print_observables=True
 
     def __str__(self):
         res=type(self).__name__+"\n"

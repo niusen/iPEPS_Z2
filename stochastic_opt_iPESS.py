@@ -123,15 +123,13 @@ print(B_set['1,1'].requires_grad)
 
 
 ls=LINESEARCH()
+ls.method='lbfgs'; # options: 'stochastic', 'cg', 'lbfgs'
 ls.maxiter=100;
 ls.gtol=1e-3;
-ls.delta0=1e-3;
-ls.alpha=3/4;
-stochastic_opt(parameters,D,chi, state, AD_ctm_args, ls_ctm_args, energy_setting, global_args, config_kwargs,  ls)
+optimize_iPESS(parameters,D,chi, state, AD_ctm_args, ls_ctm_args, energy_setting, global_args, config_kwargs,  ls)
 
 
 
 
 
         
-

@@ -2,7 +2,7 @@ import os
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"  # Must be set BEFORE importing torch
 print("PYTORCH_CUDA_ALLOC_CONF:", os.environ.get("PYTORCH_CUDA_ALLOC_CONF"))
 import sys
-sys.path.append('/home/sniu/python_code/iPEPS_Z2/')
+sys.path.append('/home/sniu/python_code/iPEPS_Z2_test_codex/')
 from collections import OrderedDict
 import json
 import numpy
@@ -73,7 +73,7 @@ global_args.Ly=Ly;
 global_args.device=config_kwargs['default_device'];
 
 #filenm='SU_iPESS_Z2_csl_D'+str(D);
-filenm='Z2_D4_chi40_-2.3798'
+filenm='Z2_D4_chi40_-1.616'
 B_set,T_set=load_triangle_iPESS(filenm,config_kwargs);
 state=IPESS_TRIANGLE(B_set,T_set,config_kwargs)
 
@@ -121,13 +121,28 @@ print(B_set['1,1'].requires_grad)
 
 
 
+opt_method='lbfgs'; # options: 'stochastic', 'cg', 'lbfgs'
 
 ls=LINESEARCH()
+ls.method=opt_method;
 ls.maxiter=100;
-ls.gtol=1e-3;
-ls.delta0=1e-3;
-ls.alpha=3/4;
-stochastic_opt(parameters,D,chi, state, AD_ctm_args, ls_ctm_args, energy_setting, global_args, config_kwargs,  ls)
+ls.gtol=1e-5;
+
+if opt_method=='stochastic':
+    ls.delta0=1e-3;
+    ls.alpha=3/4;
+    stochastic_opt(parameters,D,chi, state, AD_ctm_args, ls_ctm_args, energy_setting, global_args, config_kwargs,  ls)
+elif opt_method=='cg':
+    ls.cg_beta='PRP'; # options: 'PRP', 'FR'
+    ls.line_search='hager_zhang'; # options: 'hager_zhang', 'backtracking'
+    optimize_iPESS(parameters,D,chi, state, AD_ctm_args, ls_ctm_args, energy_setting, global_args, config_kwargs,  ls)
+elif opt_method=='lbfgs':
+    ls.line_search='hager_zhang'; # options: 'hager_zhang', 'backtracking'
+    optimize_iPESS(parameters,D,chi, state, AD_ctm_args, ls_ctm_args, energy_setting, global_args, config_kwargs,  ls)
+else:
+    raise ValueError("unknown optimization method: "+str(opt_method))
+
+
 
 
 
