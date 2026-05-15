@@ -15,6 +15,26 @@ def _to_float(x):
     return float(numpy.real(x))
 
 
+def _ctmrg_err_to_float(ite_err):
+    if isinstance(ite_err, (list, tuple)):
+        if len(ite_err)==0:
+            return numpy.inf
+        return max(_ctmrg_err_to_float(err) for err in ite_err)
+    return _to_float(ite_err)
+
+
+def _save_line_search_tensor_if_strict(state, E_trial, history_min_E, ite_err, D, chi, config_kwargs):
+    E_trial_float=_to_float(E_trial)
+    history_min_E_float=_to_float(history_min_E)
+    ite_err_float=_ctmrg_err_to_float(ite_err)
+    if (ite_err_float<1e-2) and (E_trial_float<history_min_E_float):
+        filenm='Z2_D'+str(D)+'_chi'+str(chi)
+        save_triangle_iPESS(state.B_set, state.T_set, filenm, config_kwargs)
+        return True
+    print('skip saving tensor: CTMRG err='+str(ite_err_float)+', E='+str(E_trial_float)+', history min E='+str(history_min_E_float))
+    return False
+
+
 def random_tensor_sign(T):
     T=T.copy();
     data_1d,bb=yastn.Tensor.compress_to_1d(T);
@@ -55,7 +75,7 @@ def get_random_grad(x0,delta):
 
 ####################################
 
-def cost_fun(parameters,state, ctm_args, energy_setting, global_args, config_kwargs):
+def cost_fun(parameters,state, ctm_args, energy_setting, global_args, config_kwargs, return_ctm_err=False):
     state.require_grad(True)
     B_set=state.B_set
     T_set=state.T_set
@@ -78,9 +98,14 @@ def cost_fun(parameters,state, ctm_args, energy_setting, global_args, config_kwa
     # print(e0_set)
     # print(eU_set)
     print('E='+str(E_total.item()))
+    if return_ctm_err:
+        return E_total,CTM_cell,ite_err
     return E_total,CTM_cell
-def get_grad(parameters,state, ctm_args, energy_setting, global_args, config_kwargs):
-    E, CTM_cell=cost_fun(parameters,state, ctm_args, energy_setting, global_args, config_kwargs)
+def get_grad(parameters,state, ctm_args, energy_setting, global_args, config_kwargs, return_ctm_err=False):
+    if return_ctm_err:
+        E, CTM_cell, ite_err=cost_fun(parameters,state, ctm_args, energy_setting, global_args, config_kwargs, return_ctm_err=True)
+    else:
+        E, CTM_cell=cost_fun(parameters,state, ctm_args, energy_setting, global_args, config_kwargs)
     start_time_grad = time.time()
     E.backward()
     end_grad = time.time()
@@ -94,6 +119,8 @@ def get_grad(parameters,state, ctm_args, energy_setting, global_args, config_kwa
         T_set_grad.update({key: state.T_set[key].grad()})
     state_grad=IPESS_TRIANGLE(B_set_grad, T_set_grad, state.global_args);
     print("norm of grad:"+str(state_grad.norm()));
+    if return_ctm_err:
+        return state_grad,E,CTM_cell,ite_err
     return state_grad,E, CTM_cell
 
 
@@ -145,7 +172,7 @@ def subtract_state(state1,state2):
 
 
 
-def fx(parameters,state, CTM0, ls_ctm_args, energy_setting, global_args, config_kwargs):
+def fx(parameters,state, CTM0, ls_ctm_args, energy_setting, global_args, config_kwargs, return_ctm_err=False):
     state.require_grad(False)
     B_set=state.B_set
     T_set=state.T_set
@@ -212,10 +239,12 @@ def fx(parameters,state, CTM0, ls_ctm_args, energy_setting, global_args, config_
         print('occupation:')
         print(e0_set.tolist())
 
+    if return_ctm_err:
+        return E_total,ite_err
     return E_total
 
 
-def backtracking_line_search(parameters, x, direction, E0, grad, CTM_cell, D, chi,
+def backtracking_line_search(parameters, x, direction, E0, E_min, grad, CTM_cell, D, chi,
                              ls_ctm_args, energy_setting, global_args, config_kwargs, ls):
     alpha=getattr(ls,'step0',1.0)
     shrink=getattr(ls,'alpha',3/4)
@@ -224,35 +253,36 @@ def backtracking_line_search(parameters, x, direction, E0, grad, CTM_cell, D, ch
     min_step=getattr(ls,'min_step',1e-12)
     direction,dphi0=make_descent_direction(grad,direction)
     E0=_to_float(E0)
+    E_min=_to_float(E_min)
     best_x=x
     best_E=E0
+    best_ite_err=numpy.inf
 
     with torch.no_grad():
         for ls_step in range(1,ls_maxiter+1):
             print('backtracking line search step '+str(ls_step)+', alpha='+str(alpha))
             x_trial=add_scaled_state(x,direction,alpha)
             x_trial.normalize()
-            E_trial=fx(parameters, x_trial, CTM_cell, ls_ctm_args, energy_setting, global_args, config_kwargs)
+            E_trial,ite_err=fx(parameters, x_trial, CTM_cell, ls_ctm_args, energy_setting, global_args, config_kwargs, return_ctm_err=True)
             E_trial_float=_to_float(E_trial)
             armijo_rhs=E0+c1*alpha*dphi0
 
             if E_trial_float<best_E:
                 best_x=x_trial
                 best_E=E_trial_float
+                best_ite_err=ite_err
 
             if E_trial_float<=armijo_rhs:
                 print('accepted alpha='+str(alpha)+', E='+str(E_trial_float))
-                filenm='Z2_D'+str(D)+'_chi'+str(chi)
-                save_triangle_iPESS(x_trial.B_set, x_trial.T_set, filenm, config_kwargs)
-                return x_trial,E_trial_float,alpha,True
+                _save_line_search_tensor_if_strict(x_trial,E_trial_float,E_min,ite_err,D,chi,config_kwargs)
+                return x_trial,E_trial_float,alpha,True,None,None
 
             alpha=alpha*shrink
             if alpha<min_step:
                 break
 
     if best_E<E0:
-        filenm='Z2_D'+str(D)+'_chi'+str(chi)
-        save_triangle_iPESS(best_x.B_set, best_x.T_set, filenm, config_kwargs)
+        _save_line_search_tensor_if_strict(best_x,best_E,E_min,best_ite_err,D,chi,config_kwargs)
     print('line search failed Armijo condition; use best trial E='+str(best_E))
     return best_x,best_E,alpha,False,None,None
 
@@ -260,10 +290,10 @@ def backtracking_line_search(parameters, x, direction, E0, grad, CTM_cell, D, ch
 def _line_search_grad_eval(parameters, x, direction, alpha, AD_ctm_args, energy_setting, global_args, config_kwargs):
     x_trial=add_scaled_state(x,direction,alpha)
     x_trial.normalize()
-    grad_trial,E_trial,CTM_trial=get_grad(parameters, x_trial, AD_ctm_args, energy_setting, global_args, config_kwargs)
+    grad_trial,E_trial,CTM_trial,ite_err=get_grad(parameters, x_trial, AD_ctm_args, energy_setting, global_args, config_kwargs, return_ctm_err=True)
     E_trial_float=_to_float(E_trial)
     dphi_trial=state_inner(grad_trial,direction)
-    return x_trial,E_trial_float,grad_trial,dphi_trial,CTM_trial
+    return x_trial,E_trial_float,grad_trial,dphi_trial,CTM_trial,ite_err
 
 
 def _hz_accept(phi, dphi, phi0, dphi0, alpha, ls):
@@ -275,13 +305,16 @@ def _hz_accept(phi, dphi, phi0, dphi0, alpha, ls):
     return wolfe or approx_wolfe
 
 
-def print_accepted_observables(parameters, state, CTM_cell, ls_ctm_args, energy_setting, global_args, config_kwargs, ls):
+def print_accepted_observables(parameters, state, CTM_cell, ls_ctm_args, energy_setting, global_args, config_kwargs, ls, return_ctm_err=False):
     if getattr(ls,'print_observables',True):
         print('accepted-step observables:')
-        fx(parameters, state, CTM_cell, ls_ctm_args, energy_setting, global_args, config_kwargs)
+        return fx(parameters, state, CTM_cell, ls_ctm_args, energy_setting, global_args, config_kwargs, return_ctm_err=return_ctm_err)
+    if return_ctm_err:
+        return fx(parameters, state, CTM_cell, ls_ctm_args, energy_setting, global_args, config_kwargs, return_ctm_err=True)
+    return None
 
 
-def hager_zhang_line_search(parameters, x, direction, E0, grad, CTM_cell, D, chi,
+def hager_zhang_line_search(parameters, x, direction, E0, E_min, grad, CTM_cell, D, chi,
                             AD_ctm_args, ls_ctm_args, energy_setting, global_args, config_kwargs, ls):
     alpha=getattr(ls,'step0',1.0)
     expand=getattr(ls,'hz_expand',2.0)
@@ -289,6 +322,7 @@ def hager_zhang_line_search(parameters, x, direction, E0, grad, CTM_cell, D, chi
     min_step=getattr(ls,'min_step',1e-12)
     direction,dphi0=make_descent_direction(grad,direction)
     E0=_to_float(E0)
+    E_min=_to_float(E_min)
 
     best_x=x
     best_E=E0
@@ -300,7 +334,7 @@ def hager_zhang_line_search(parameters, x, direction, E0, grad, CTM_cell, D, chi
 
     for ls_step in range(1,ls_maxiter+1):
         print('Hager-Zhang line search step '+str(ls_step)+', alpha='+str(alpha))
-        x_trial,E_trial,grad_trial,dphi_trial,CTM_trial=_line_search_grad_eval(
+        x_trial,E_trial,grad_trial,dphi_trial,CTM_trial,_ite_err=_line_search_grad_eval(
             parameters,x,direction,alpha,AD_ctm_args,energy_setting,global_args,config_kwargs)
 
         if E_trial<best_E:
@@ -311,9 +345,8 @@ def hager_zhang_line_search(parameters, x, direction, E0, grad, CTM_cell, D, chi
 
         if _hz_accept(E_trial,dphi_trial,E0,dphi0,alpha,ls):
             print('accepted alpha='+str(alpha)+', E='+str(E_trial)+', dphi='+str(dphi_trial))
-            filenm='Z2_D'+str(D)+'_chi'+str(chi)
-            save_triangle_iPESS(x_trial.B_set, x_trial.T_set, filenm, config_kwargs)
-            print_accepted_observables(parameters, x_trial, CTM_trial, ls_ctm_args, energy_setting, global_args, config_kwargs, ls)
+            E_obs,ite_err_obs=print_accepted_observables(parameters, x_trial, CTM_trial, ls_ctm_args, energy_setting, global_args, config_kwargs, ls, return_ctm_err=True)
+            _save_line_search_tensor_if_strict(x_trial,E_obs,E_min,ite_err_obs,D,chi,config_kwargs)
             return x_trial,E_trial,alpha,True,grad_trial,CTM_trial
 
         if (E_trial>E0) or (ls_step>1 and E_trial>=low_E):
@@ -332,7 +365,7 @@ def hager_zhang_line_search(parameters, x, direction, E0, grad, CTM_cell, D, chi
                 if alpha<min_step:
                     break
                 print('Hager-Zhang zoom step '+str(zoom_step)+', alpha='+str(alpha))
-                x_trial,E_trial,grad_trial,dphi_trial,CTM_trial=_line_search_grad_eval(
+                x_trial,E_trial,grad_trial,dphi_trial,CTM_trial,_ite_err=_line_search_grad_eval(
                     parameters,x,direction,alpha,AD_ctm_args,energy_setting,global_args,config_kwargs)
 
                 if E_trial<best_E:
@@ -343,9 +376,8 @@ def hager_zhang_line_search(parameters, x, direction, E0, grad, CTM_cell, D, chi
 
                 if _hz_accept(E_trial,dphi_trial,E0,dphi0,alpha,ls):
                     print('accepted alpha='+str(alpha)+', E='+str(E_trial)+', dphi='+str(dphi_trial))
-                    filenm='Z2_D'+str(D)+'_chi'+str(chi)
-                    save_triangle_iPESS(x_trial.B_set, x_trial.T_set, filenm, config_kwargs)
-                    print_accepted_observables(parameters, x_trial, CTM_trial, ls_ctm_args, energy_setting, global_args, config_kwargs, ls)
+                    E_obs,ite_err_obs=print_accepted_observables(parameters, x_trial, CTM_trial, ls_ctm_args, energy_setting, global_args, config_kwargs, ls, return_ctm_err=True)
+                    _save_line_search_tensor_if_strict(x_trial,E_obs,E_min,ite_err_obs,D,chi,config_kwargs)
                     return x_trial,E_trial,alpha,True,grad_trial,CTM_trial
 
                 if (E_trial>E0) or (E_trial>=low_E):
@@ -362,21 +394,20 @@ def hager_zhang_line_search(parameters, x, direction, E0, grad, CTM_cell, D, chi
             break
 
     if best_E<E0:
-        filenm='Z2_D'+str(D)+'_chi'+str(chi)
-        save_triangle_iPESS(best_x.B_set, best_x.T_set, filenm, config_kwargs)
-        print_accepted_observables(parameters, best_x, best_CTM, ls_ctm_args, energy_setting, global_args, config_kwargs, ls)
+        E_obs,ite_err_obs=print_accepted_observables(parameters, best_x, best_CTM, ls_ctm_args, energy_setting, global_args, config_kwargs, ls, return_ctm_err=True)
+        _save_line_search_tensor_if_strict(best_x,E_obs,E_min,ite_err_obs,D,chi,config_kwargs)
     print('Hager-Zhang line search failed; use best trial E='+str(best_E))
     return best_x,best_E,alpha,False,best_grad,best_CTM
 
 
-def line_search(parameters, x, direction, E0, grad, CTM_cell, D, chi,
+def line_search(parameters, x, direction, E0, E_min, grad, CTM_cell, D, chi,
                 AD_ctm_args, ls_ctm_args, energy_setting, global_args, config_kwargs, ls):
     method=getattr(ls,'line_search','hager_zhang').lower()
     if method in ('hager_zhang','hager-zhang','hz'):
-        return hager_zhang_line_search(parameters,x,direction,E0,grad,CTM_cell,D,chi,
+        return hager_zhang_line_search(parameters,x,direction,E0,E_min,grad,CTM_cell,D,chi,
                                        AD_ctm_args,ls_ctm_args,energy_setting,global_args,config_kwargs,ls)
     elif method in ('backtracking','armijo'):
-        return backtracking_line_search(parameters,x,direction,E0,grad,CTM_cell,D,chi,
+        return backtracking_line_search(parameters,x,direction,E0,E_min,grad,CTM_cell,D,chi,
                                         ls_ctm_args,energy_setting,global_args,config_kwargs,ls)
     else:
         raise ValueError("unknown line search method: "+str(method))
@@ -422,7 +453,7 @@ def nonlinear_cg_opt(parameters, D,chi, x0, AD_ctm_args, ls_ctm_args, energy_set
             print("CG beta="+str(beta))
 
         x_new,E_new,alpha,accepted,grad_new,CTM_new=line_search(
-            parameters,x,direction,E_float,grad,CTM_cell,D,chi,
+            parameters,x,direction,E_float,E_min,grad,CTM_cell,D,chi,
             AD_ctm_args,ls_ctm_args,energy_setting,global_args,config_kwargs,ls)
 
         end_=time.time()
@@ -500,7 +531,7 @@ def lbfgs_opt(parameters, D,chi, x0, AD_ctm_args, ls_ctm_args, energy_setting, g
 
         direction=lbfgs_direction(grad,history)
         x_new,E_new,alpha,accepted,grad_new,CTM_new=line_search(
-            parameters,x,direction,E_float,grad,CTM_cell,D,chi,
+            parameters,x,direction,E_float,E_min,grad,CTM_cell,D,chi,
             AD_ctm_args,ls_ctm_args,energy_setting,global_args,config_kwargs,ls)
 
         if accepted:
@@ -585,14 +616,14 @@ def stochastic_opt(parameters, D,chi, x0, AD_ctm_args, ls_ctm_args, energy_setti
                 print("norm of random grad:"+str(xgrad_rand.norm()))
                 x_updated=subtract_state(x,xgrad_rand)
 
-                E_updated=fx(parameters, x_updated, CTM_cell, ls_ctm_args, energy_setting, global_args, config_kwargs);
+                E_updated,ite_err=fx(parameters, x_updated, CTM_cell, ls_ctm_args, energy_setting, global_args, config_kwargs, return_ctm_err=True);
                 E_updated=E_updated.item();
                 ls_step=ls_step+1;
                 
-                filenm='Z2_D'+str(D)+'_chi'+str(chi);
                 if (E_updated<E_min) :
+                    history_min_E=E_min
                     E_min=E_updated
-                    save_triangle_iPESS(x_updated.B_set, x_updated.T_set, filenm, config_kwargs)
+                    _save_line_search_tensor_if_strict(x_updated,E_updated,history_min_E,ite_err,D,chi,config_kwargs)
                     end_ = time.time()
                     print('time consumed: '+time.strftime("%H hours, %M minuts, %S seconds", time.gmtime(end_ - start_time)))
                     break;
@@ -605,14 +636,3 @@ def stochastic_opt(parameters, D,chi, x0, AD_ctm_args, ls_ctm_args, energy_setti
             gnorm = state_grad.norm();
     
     return x
-
-
-
-
-
-
-
-
-
-
-
