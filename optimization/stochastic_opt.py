@@ -67,8 +67,10 @@ def cost_fun(parameters,state, ctm_args, energy_setting, global_args, config_kwa
         double_T_set=Cell_to_device(double_T_set,global_args.device,global_args);
     if energy_setting.model=="spinful_triangle_lattice":
         E_total,  ex_set, ey_set, e_diagonala_set, e0_set, eU_set=evaluate_ob_cell_iPESS(parameters, B_set,T_set, double_B_set, double_T_set, CTM_cell, energy_setting, config_kwargs, global_args);
-    elif energy_setting.model=="triangle_spinHall":
+    elif energy_setting.model in ("triangle_spinHall", "triangle_spinfulHofstadter"):
         E_total,  ex_up_set, ey_up_set, e_diagonala_up_set, ex_dn_set, ey_dn_set, e_diagonala_dn_set, e0_set, eU_set, sx_set, sy_set, sz_set=evaluate_ob_cell_iPESS(parameters, B_set,T_set, double_B_set, double_T_set, CTM_cell, energy_setting, config_kwargs, global_args);
+    elif energy_setting.model == "triangle_spinlessHofstadter":
+        E_total,  ex_set, ey_set, e_diagonala_set, e0_set =evaluate_ob_cell_iPESS(parameters, B_set,T_set, double_B_set, double_T_set, CTM_cell, energy_setting, config_kwargs, global_args);
     # print(E_total)
     # print(ex_set)
     # print(ey_set)
@@ -175,7 +177,7 @@ def fx(parameters,state, CTM0, ls_ctm_args, energy_setting, global_args, config_
         print(sz_set.tolist())
         S2=torch.sqrt(sx_set**2+sy_set**2+sz_set**2)
         print(S2.tolist())
-    elif energy_setting.model=="triangle_spinHall":
+    elif energy_setting.model in ("triangle_spinHall", "triangle_spinfulHofstadter"):
         E_total,  ex_up_set, ey_up_set, e_diagonala_up_set, ex_dn_set, ey_dn_set, e_diagonala_dn_set, e0_set, eU_set, sx_set, sy_set, sz_set=evaluate_ob_cell_iPESS(parameters, B_set,T_set, double_B_set, double_T_set, CTM_cell, energy_setting, config_kwargs, global_args);
         print('E= '+str(E_total.item()))
         print('hopping for spin up:')
@@ -200,6 +202,16 @@ def fx(parameters,state, CTM0, ls_ctm_args, energy_setting, global_args, config_
         print('total magnetization:')
         S2=torch.sqrt(sx_set**2+sy_set**2+sz_set**2)
         print(S2.tolist())
+    elif energy_setting.model == "triangle_spinlessHofstadter":
+        E_total,  ex_set, ey_set, e_diagonala_set, e0_set =evaluate_ob_cell_iPESS(parameters, B_set,T_set, double_B_set, double_T_set, CTM_cell, energy_setting, config_kwargs, global_args);
+        print('E= '+str(E_total.item()))
+        print('hopping:')
+        print(ex_set.tolist())
+        print(ey_set.tolist())
+        print(e_diagonala_set.tolist())
+        print('occupation:')
+        print(e0_set.tolist())
+
     return E_total
 
 

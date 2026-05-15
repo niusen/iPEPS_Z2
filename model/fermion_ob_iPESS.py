@@ -159,6 +159,46 @@ def Hamiltonians_spinful_Z2(config_kwargs):
     CdagC_string = yastn.eye(config=config_Z2,legs=C_.get_legs(axes=1-1), isdiag=False)
     return Ident_, N_occu_, n_double_, Cdag_, C_, CdagC_string
 
+def Hamiltonians_spinless_Z2(config_kwargs):
+    config_Z2 = yastn.make_config(sym='Z2',fermionic=True, **config_kwargs)
+    Device=config_kwargs['default_device'];
+
+    Vp = yastn.Leg(config_Z2, s=1, t=(0, 1), D=(1, 1))
+    Vp_conj = yastn.Leg(config_Z2, s=-1, t=(0, 1), D=(1, 1))
+    Vdummy = yastn.Leg(config_Z2, s=-1, t=[1], D=[1])
+    Vdummy_conj = yastn.Leg(config_Z2, s=1, t=[1], D=[1])
+
+    Id=torch.tensor([[1.0, 0], [0, 1.0]]).to(device=Device);
+    sm=torch.tensor([[0, 1.0], [0, 0]]).to(device=Device); 
+    sp=torch.tensor([[0, 0], [1.0, 0]]).to(device=Device);
+    sz=torch.tensor([[1.0, 0], [0, -1.0]]).to(device=Device); 
+    occu=torch.tensor([[0, 0], [0, 1.0]]).to(device=Device);
+    
+    #order of kron() command: (0,0), (0,1), (1,0), (1,1)
+
+    Ident=Id;
+    Ident_=yastn.zeros(config=config_Z2, legs=[Vp,Vp_conj])
+    Ident_=fill_Z2_Ham(Ident,Ident_)
+
+    N_occu=occu;
+    N_occu_=yastn.zeros(config=config_Z2, legs=[Vp,Vp_conj])
+    N_occu_=fill_Z2_Ham(N_occu,N_occu_)
+
+    Cdag=torch.zeros((2,2,1),dtype=Id.dtype,device=Id.device);
+    Cdag[:,:,0]=sp;
+    Cdag_=yastn.zeros(config=config_Z2, legs=[Vp,Vp_conj,Vdummy])
+    Cdag_=fill_Z2_Ham(Cdag,Cdag_)
+    Cdag_=yastn.transpose(Cdag_,axes=(2,0,1))
+
+    C=torch.zeros((1,2,2),dtype=Id.dtype,device=Id.device);
+    C[0,:,:]=sm;
+    C_=yastn.zeros(config=config_Z2, legs=[Vdummy_conj, Vp,Vp_conj])
+    C_=fill_Z2_Ham(C,C_)
+    # C=TensorMap(, Vdummy ⊗ V ← V);
+   
+    CdagC_string = yastn.eye(config=config_Z2,legs=C_.get_legs(axes=1-1), isdiag=False)
+    return Ident_, N_occu_, Cdag_, C_, CdagC_string
+
 def hopping_spin_resolved_Z2(config_kwargs):
     config_Z2 = yastn.make_config(sym='Z2',fermionic=True, **config_kwargs)
     Device=config_kwargs['default_device'];
@@ -1297,7 +1337,7 @@ def evaluate_ob_cell_iPESS(parameters, B_set,T_set, double_B_set, double_T_set, 
         # print(E_Bz)
         E_total=E_total/(Lx*Ly);
         return torch.real(E_total),  ex_set, ey_set, e_diagonala_set, e0_set, eU_set
-    elif energy_setting.model=="triangle_spinHall":
+    elif energy_setting.model in ("triangle_spinHall", "triangle_spinfulHofstadter"):
 
         Cdagup_, Cup_, CdagC_up_string, Cdagdn_, Cdn_, CdagC_dn_string = hopping_spin_resolved_Z2(config_kwargs);
         sx_op,sy_op,sz_op=spin_operator_Z2(config_kwargs);
@@ -1356,15 +1396,63 @@ def evaluate_ob_cell_iPESS(parameters, B_set,T_set, double_B_set, double_T_set, 
                     sy_set[cx-1,cy-1]=e_sy;
                     sz_set[cx-1,cy-1]=e_sz;
                 
-                if mod(cx,2)==1:
-                    E_total=E_total+torch.real(t1*(cmath.exp(1j*ϕ)*ex_up + cmath.exp(-1j*ϕ)*ex_dn)*2-t1*(ey_up-ey_dn)*2-t2*(e_diagonala_up - e_diagonala_dn)*2 -μ*e0 +U*eU+mx*e_sx);
-                else:
-                    E_total=E_total+torch.real(t1*(cmath.exp(1j*ϕ)*ex_up + cmath.exp(-1j*ϕ)*ex_dn)*2+t1*(ey_up-ey_dn)*2+t2*(e_diagonala_up - e_diagonala_dn)*2 -μ*e0 +U*eU+mx*e_sx);
-
-
+                if energy_setting.model=="triangle_spinHall":
+                    if mod(cx,2)==1:
+                        E_total=E_total+torch.real(t1*(cmath.exp(1j*ϕ)*ex_up + cmath.exp(-1j*ϕ)*ex_dn)*2-t1*(ey_up-ey_dn)*2-t2*(e_diagonala_up - e_diagonala_dn)*2 -μ*e0 +U*eU+mx*e_sx);
+                    else:
+                        E_total=E_total+torch.real(t1*(cmath.exp(1j*ϕ)*ex_up + cmath.exp(-1j*ϕ)*ex_dn)*2+t1*(ey_up-ey_dn)*2+t2*(e_diagonala_up - e_diagonala_dn)*2 -μ*e0 +U*eU+mx*e_sx);
+                elif energy_setting.model =="triangle_spinfulHofstadter":
+                    if mod(cx,2)==1:
+                        E_total=E_total+torch.real(t1*(cmath.exp(1j*ϕ)*ex_up + cmath.exp(1j*ϕ)*ex_dn)*2-t1*(ey_up+ey_dn)*2-t2*(e_diagonala_up + e_diagonala_dn)*2 -μ*e0 +U*eU+mx*e_sx);
+                    else:
+                        E_total=E_total+torch.real(t1*(cmath.exp(1j*ϕ)*ex_up + cmath.exp(1j*ϕ)*ex_dn)*2+t1*(ey_up+ey_dn)*2+t2*(e_diagonala_up + e_diagonala_dn)*2 -μ*e0 +U*eU+mx*e_sx);
 
         E_total=E_total/(Lx*Ly);
         return torch.real(E_total),  ex_up_set, ey_up_set, e_diagonala_up_set, ex_dn_set, ey_dn_set, e_diagonala_dn_set, e0_set, eU_set, sx_set, sy_set, sz_set
+    elif energy_setting.model =="triangle_spinlessHofstadter":
+        with torch.no_grad(): 
+            Ident, N_occu, Cdag_, C_, CdagC_string =Hamiltonians_spinless_Z2(config_kwargs);
+
+        assert mod(Lx,2)==0
+        #for 120 degree magnetic order in the Hofstadter M2 model. Unit-cell for 120 degree order should be at least 3x3. 
+
+        t1=parameters['t1'];
+        t2=parameters['t2'];
+        ϕ=parameters['ϕ'];
+        μ=parameters['μ'];
+
+        with torch.no_grad():
+            ex_set=torch.zeros(Lx,Ly)*1j;
+            e_diagonala_set=torch.zeros(Lx,Ly)*1j;
+            ey_set=torch.zeros(Lx,Ly)*1j;
+            e0_set=torch.zeros(Lx,Ly)*1j;
+
+        
+        
+        # E_total=0;
+        E_total=torch.zeros((1), dtype=B_set['1,1'].dtype,device=B_set['1,1'].device,requires_grad=True);
+        for cx in range(1,Lx+1):
+            for cy in range(1,Ly+1):
+
+                ex=checkpoint(hopping_x_iPESS, CTM_cell, Cdag_, C_, CdagC_string, B_set,T_set, double_B_set, double_T_set,cx,cy,Lx,Ly, use_reentrant=False);
+                ey=checkpoint(hopping_y_iPESS, CTM_cell, Cdag_, C_, CdagC_string, B_set,T_set, double_B_set, double_T_set,cx,cy,Lx,Ly, use_reentrant=False);
+                e_diagonala=checkpoint(hopping_diagonala_iPESS, CTM_cell, Cdag_, C_, CdagC_string, B_set,T_set, double_B_set, double_T_set,cx,cy,Lx,Ly, use_reentrant=False);
+                e0=checkpoint(ob_onsite_iPESS, CTM_cell,N_occu, B_set,T_set, double_B_set, double_T_set,cx,cy,Lx,Ly, use_reentrant=False);
+
+                with torch.no_grad():
+                    ex_set[cx-1,cy-1]=ex;
+                    ey_set[cx-1,cy-1]=ey;
+                    e_diagonala_set[cx-1,cy-1]=e_diagonala;
+                    e0_set[cx-1,cy-1]=e0;
+                
+
+                if mod(cx,2)==1:
+                    E_total=E_total+torch.real(t1*(cmath.exp(1j*ϕ)*ex)*2-t1*(ey)*2-t2*(e_diagonala)*2 -μ*e0);
+                else:
+                    E_total=E_total+torch.real(t1*(cmath.exp(1j*ϕ)*ex)*2+t1*(ey)*2+t2*(e_diagonala)*2 -μ*e0);
+
+        E_total=E_total/(Lx*Ly);
+        return torch.real(E_total),  ex_set, ey_set, e_diagonala_set, e0_set
     elif energy_setting.model =="standard_triangle_Hubbard":    
         t1=parameters['t1'];
         t2=parameters['t2'];
