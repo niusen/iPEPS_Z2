@@ -342,3 +342,105 @@ def cal_correl(CTM_cell,B_set,T_set,B_double_set, T_double_set,D,chi,direction,d
 
     savemat(mat_filenm+".mat", datadic)
     return SS_ob_set,CdagC_ob_set
+
+
+
+def cal_correl_spin_resolved(CTM_cell,B_set,T_set,B_double_set, T_double_set,D,chi,direction,distance, config_kwargs, global_args, partly):
+    Lx=global_args.Lx
+    Ly=global_args.Ly
+
+    #Ident, N_occu, n_double, Cdag, C, CdagC_string =Hamiltonians_spinful_Z2(config_kwargs);
+    Cdagup_, Cup_, CdagC_up_string, Cdagdn_, Cdn_, CdagC_dn_string=hopping_spin_resolved_Z2(config_kwargs);
+    S1L, S1R, SS_string, chirality_S1, chirality_S2, chirality_S3, chirality_string12, chirality_string23 =Operators_spinful_Z2(config_kwargs);
+    
+
+    if partly:
+        x_range=range(1,1+1);
+        y_range=range(1,1+1);
+    else:
+        x_range=range(1,Lx+1);
+        y_range=range(1,Ly+1);
+    
+    def cal_CdagC(x_range,y_range,distance,direction, Lx,Ly,CTM_cell,config_kwargs,partly,B_set,T_set,B_double_set, T_double_set, Cdag, C, CdagC_string):
+        CdagC_ob_set=numpy.zeros((len(x_range),len(y_range),distance),dtype=numpy.complex128);
+        if direction=="x":
+            n_values=10;
+            eu_x_cell,Q_set=solve_correl_length_simple(n_values,CTM_cell,"x",Lx,Ly,config_kwargs,partly);
+
+            for cb in y_range:
+                double_B_CdagC_L_set=OrderedDict();
+                double_T_CdagC_L_set=OrderedDict();
+                double_B_CdagC_R_set=OrderedDict();
+                double_T_CdagC_R_set=OrderedDict();
+                double_B_CdagC_mid_set=OrderedDict();
+                double_T_CdagC_mid_set=OrderedDict();
+
+                for ca in range(1,Lx+1):
+                    B_double_CdagC_L,T_double_CdagC_L, B_double_CdagC_mid,T_double_CdagC_mid, B_double_CdagC_R,T_double_CdagC_R=build_AA_hop(Cdag, C, CdagC_string, B_set,T_set,ca,cb,Lx);
+                    double_B_CdagC_L_set.update({str(ca):B_double_CdagC_L});
+                    double_T_CdagC_L_set.update({str(ca):T_double_CdagC_L});
+                    double_B_CdagC_mid_set.update({str(mod1(ca+1,Lx)):B_double_CdagC_mid});
+                    double_T_CdagC_mid_set.update({str(mod1(ca+1,Lx)):T_double_CdagC_mid});
+                    double_B_CdagC_R_set.update({str(mod1(ca+2,Lx)):B_double_CdagC_R});
+                    double_T_CdagC_R_set.update({str(mod1(ca+2,Lx)):T_double_CdagC_R});
+            
+                for ca in x_range:
+                
+                    #################################
+                    norms=evaluate_correl([ca,cb],1,"x", Cell_take_cy(B_double_set,cb,Lx,Ly), Cell_take_cy(T_double_set,cb,Lx,Ly), Cell_take_cy(B_double_set,cb,Lx,Ly), Cell_take_cy(T_double_set,cb,Lx,Ly), Cell_take_cy(B_double_set,cb,Lx,Ly), Cell_take_cy(T_double_set,cb,Lx,Ly), CTM_cell, distance,global_args);
+                    norm_coe=(norms[4+Lx]/norms[4])**(1/Lx); #get a rough normalization coefficient to avoid that the number becomes two small
+                    norms=evaluate_correl([ca,cb],1/norm_coe,"x", Cell_take_cy(B_double_set,cb,Lx,Ly), Cell_take_cy(T_double_set,cb,Lx,Ly), Cell_take_cy(B_double_set,cb,Lx,Ly), Cell_take_cy(T_double_set,cb,Lx,Ly), Cell_take_cy(B_double_set,cb,Lx,Ly), Cell_take_cy(T_double_set,cb,Lx,Ly), CTM_cell, distance,global_args);
+                    hopping_ob=evaluate_correl([ca,cb], 1/norm_coe, "x", double_B_CdagC_mid_set,double_T_CdagC_mid_set, double_B_CdagC_L_set,double_T_CdagC_L_set, double_B_CdagC_R_set,double_T_CdagC_R_set, CTM_cell, distance,global_args);
+                    
+                    hopping_ob=hopping_ob/norms;
+                    CdagC_ob_set[ca-1,cb-1,:]=hopping_ob;
+        return CdagC_ob_set
+                
+    SS_ob_set=numpy.zeros((len(x_range),len(y_range),distance),dtype=numpy.complex128);
+
+    if direction=="x":
+        n_values=10;
+        eu_x_cell,Q_set=solve_correl_length_simple(n_values,CTM_cell,"x",Lx,Ly,config_kwargs,partly);
+
+        for cb in y_range:
+            double_B_spin_L_set=OrderedDict();
+            double_T_spin_L_set=OrderedDict();
+            double_B_spin_R_set=OrderedDict();
+            double_T_spin_R_set=OrderedDict();
+            double_B_spin_mid_set=OrderedDict();
+            double_T_spin_mid_set=OrderedDict();
+
+            for ca in range(1,Lx+1):
+            
+                B_double_spin_L,T_double_spin_L, B_double_spin_mid,T_double_spin_mid, B_double_spin_R,T_double_spin_R=build_AA_spin(S1L,S1R,SS_string, B_set,T_set,ca,cb,Lx);
+                double_B_spin_L_set.update({str(ca):B_double_spin_L});
+                double_T_spin_L_set.update({str(ca):T_double_spin_L});
+                double_B_spin_mid_set.update({str(mod1(ca+1,Lx)):B_double_spin_mid});
+                double_T_spin_mid_set.update({str(mod1(ca+1,Lx)):T_double_spin_mid});
+                double_B_spin_R_set.update({str(mod1(ca+2,Lx)):B_double_spin_R});
+                double_T_spin_R_set.update({str(mod1(ca+2,Lx)):T_double_spin_R});
+                
+            for ca in x_range:
+                #################################
+                norms=evaluate_correl([ca,cb],1,"x", Cell_take_cy(B_double_set,cb,Lx,Ly), Cell_take_cy(T_double_set,cb,Lx,Ly), Cell_take_cy(B_double_set,cb,Lx,Ly), Cell_take_cy(T_double_set,cb,Lx,Ly), Cell_take_cy(B_double_set,cb,Lx,Ly), Cell_take_cy(T_double_set,cb,Lx,Ly), CTM_cell, distance,global_args);
+                norm_coe=(norms[4+Lx]/norms[4])**(1/Lx); #get a rough normalization coefficient to avoid that the number becomes two small
+                norms=evaluate_correl([ca,cb],1/norm_coe,"x", Cell_take_cy(B_double_set,cb,Lx,Ly), Cell_take_cy(T_double_set,cb,Lx,Ly), Cell_take_cy(B_double_set,cb,Lx,Ly), Cell_take_cy(T_double_set,cb,Lx,Ly), Cell_take_cy(B_double_set,cb,Lx,Ly), Cell_take_cy(T_double_set,cb,Lx,Ly), CTM_cell, distance,global_args);
+                Spin_ob=evaluate_correl([ca,cb], 1/norm_coe, "x", double_B_spin_mid_set,double_T_spin_mid_set, double_B_spin_L_set,double_T_spin_L_set, double_B_spin_R_set,double_T_spin_R_set, CTM_cell, distance,global_args);
+
+                Spin_ob=Spin_ob/norms;
+                SS_ob_set[ca-1,cb-1,:]=Spin_ob;
+    CdagC_up_set=cal_CdagC(x_range,y_range,distance,direction, Lx,Ly,CTM_cell,config_kwargs,partly,B_set,T_set,B_double_set, T_double_set, Cdagup_, Cup_, CdagC_up_string);
+    CdagC_dn_set=cal_CdagC(x_range,y_range,distance,direction, Lx,Ly,CTM_cell,config_kwargs,partly,B_set,T_set,B_double_set, T_double_set, Cdagdn_, Cdn_, CdagC_dn_string);
+
+    mat_filenm="correl_D"+str(D)+"_chi"+str(chi);
+    if partly:
+        mat_filenm=mat_filenm+"_part";
+    else:
+        mat_filenm=mat_filenm+"_full";
+    
+
+
+    datadic = {"Lx": Lx, "Ly":Ly, "SS_ob_set": SS_ob_set, "CdagC_up_set": CdagC_up_set, "CdagC_dn_set": CdagC_dn_set, "eu_x_cell": eu_x_cell, "Q_set": Q_set}
+
+    savemat(mat_filenm+".mat", datadic)
+    return SS_ob_set,CdagC_up_set,CdagC_dn_set
