@@ -39,7 +39,7 @@ torch.set_num_threads(n_cpu)
 
 
 # PRL 129, 177201 (2022), represented with the one-tensor C4/PT ansatz.
-parameters = prl_129_177201_square_csl_parameters(chirality_sign=1.0)
+parameters = prl_129_177201_square_csl_parameters(chirality_sign=-1.0)
 print(parameters)
 
 
@@ -142,6 +142,7 @@ ls.method = opt_method
 ls.maxiter = 100
 ls.gtol = 1e-5
 ls.print_observables = True
+ls.max_grad_norm = 1.0
 
 if opt_method == "stochastic":
     ls.delta0 = 1e-3

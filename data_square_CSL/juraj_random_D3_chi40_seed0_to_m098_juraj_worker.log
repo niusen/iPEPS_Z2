@@ -1,0 +1,124 @@
+INFO:optim.lbfgs_modified:LS expected phi: -0.6086664711036669 (derphi0: -2.08893561150236)
+INFO:optim.lbfgs_modified:LS final step: 0.049008033683223255
+INFO:optim.lbfgs_modified:LS expected phi: -0.6167794528425341 (derphi0: -0.1018913825258011)
+INFO:optim.lbfgs_modified:LS final step: 0.5
+INFO:optim.lbfgs_modified:LS expected phi: -0.6710024846816184 (derphi0: -0.1145819936319451)
+INFO:optim.lbfgs_modified:LS final step: 0.5
+INFO:optim.lbfgs_modified:LS expected phi: -0.7150432771682032 (derphi0: -0.04834421418214498)
+INFO:optim.lbfgs_modified:LS final step: 0.5
+INFO:optim.lbfgs_modified:LS expected phi: -0.7355471752455432 (derphi0: -0.05757418116499445)
+INFO:optim.lbfgs_modified:LS final step: 0.5
+INFO:optim.lbfgs_modified:LS expected phi: -0.7579628658164315 (derphi0: -0.03980866167733908)
+INFO:optim.lbfgs_modified:LS final step: 0.5
+INFO:optim.lbfgs_modified:LS expected phi: -0.7735573528466234 (derphi0: -0.02743661942908631)
+INFO:optim.lbfgs_modified:LS final step: 0.5
+INFO:optim.lbfgs_modified:LS expected phi: -0.7853850030591012 (derphi0: -0.05165872497668955)
+INFO:optim.lbfgs_modified:LS final step: 0.5
+INFO:optim.lbfgs_modified:LS expected phi: -0.8075206629346465 (derphi0: -0.09425810490441879)
+INFO:optim.lbfgs_modified:LS final step: 0.5
+INFO:optim.lbfgs_modified:LS expected phi: -0.8443395390349777 (derphi0: -0.06456051703451947)
+INFO:optim.lbfgs_modified:LS final step: 0.5
+INFO:optim.lbfgs_modified:LS expected phi: -0.8646325901508933 (derphi0: -0.015235489629518706)
+INFO:optim.lbfgs_modified:LS final step: 0.5
+INFO:optim.lbfgs_modified:LS expected phi: -0.8710788424481395 (derphi0: -0.0179095252680432)
+INFO:optim.lbfgs_modified:LS final step: 0.5
+INFO:optim.lbfgs_modified:LS expected phi: -0.8783792763840219 (derphi0: -0.01659244735680903)
+INFO:optim.lbfgs_modified:LS final step: 0.5
+INFO:optim.lbfgs_modified:LS expected phi: -0.8849879662649551 (derphi0: -0.027834897038142882)
+INFO:optim.lbfgs_modified:LS final step: 0.5
+INFO:optim.lbfgs_modified:LS expected phi: -0.8932508681515534 (derphi0: -0.014661510482800887)
+INFO:optim.lbfgs_modified:LS final step: 0.5
+INFO:optim.lbfgs_modified:LS expected phi: -0.8982843393328809 (derphi0: -0.004231012093447623)
+INFO:optim.lbfgs_modified:LS final step: 0.5
+INFO:optim.lbfgs_modified:LS expected phi: -0.9001029142235172 (derphi0: -0.007718782339720761)
+INFO:optim.lbfgs_modified:LS final step: 0.5
+INFO:optim.lbfgs_modified:LS expected phi: -0.9034113259306492 (derphi0: -0.011106565299972237)
+INFO:optim.lbfgs_modified:LS final step: 0.5
+INFO:optim.lbfgs_modified:LS expected phi: -0.9080522800175532 (derphi0: -0.014003546862095134)
+INFO:optim.lbfgs_modified:LS final step: 0.5
+INFO:optim.lbfgs_modified:LS expected phi: -0.9132478606943131 (derphi0: -0.014882853580575676)
+INFO:optim.lbfgs_modified:LS final step: 0.5
+INFO:optim.lbfgs_modified:LS expected phi: -0.9180298880525825 (derphi0: -0.005855494619485744)
+INFO:optim.lbfgs_modified:LS final step: 0.5
+INFO:optim.lbfgs_modified:LS expected phi: -0.920427590757047 (derphi0: -0.00635293519152824)
+INFO:optim.lbfgs_modified:LS final step: 0.5
+INFO:optim.lbfgs_modified:LS expected phi: -0.9230208277618628 (derphi0: -0.008594405403518697)
+INFO:optim.lbfgs_modified:LS final step: 0.5
+INFO:optim.lbfgs_modified:LS expected phi: -0.925907243437886 (derphi0: -0.0077095511511924685)
+INFO:optim.lbfgs_modified:LS final step: 0.5
+INFO:optim.lbfgs_modified:LS expected phi: -0.9284931418041381 (derphi0: -0.0020569035722898844)
+INFO:optim.lbfgs_modified:LS final step: 0.5
+INFO:optim.lbfgs_modified:LS expected phi: -0.9293751055416702 (derphi0: -0.0039440682296311615)
+INFO:optim.lbfgs_modified:LS final step: 0.5
+INFO:optim.lbfgs_modified:LS expected phi: -0.930920667931201 (derphi0: -0.00464231928297125)
+INFO:optim.lbfgs_modified:LS final step: 0.5
+INFO:optim.lbfgs_modified:LS expected phi: -0.9325055505573797 (derphi0: -0.004062089108285931)
+INFO:optim.lbfgs_modified:LS final step: 0.5
+INFO:optim.lbfgs_modified:LS expected phi: -0.9340441192440039 (derphi0: -0.002804277254109605)
+INFO:optim.lbfgs_modified:LS final step: 0.5
+INFO:optim.lbfgs_modified:LS expected phi: -0.9352338183901981 (derphi0: -0.003694221031530065)
+INFO:optim.lbfgs_modified:LS final step: 0.5
+INFO:optim.lbfgs_modified:LS expected phi: -0.9366356372916909 (derphi0: -0.005406013169851341)
+INFO:optim.lbfgs_modified:LS final step: 0.5
+INFO:optim.lbfgs_modified:LS expected phi: -0.9369199176380657 (derphi0: -0.001821217815164812)
+INFO:optim.lbfgs_modified:LS final step: 0.5
+INFO:optim.lbfgs_modified:LS expected phi: -0.9376202510084585 (derphi0: -0.0006545798633481724)
+INFO:optim.lbfgs_modified:LS final step: 0.5
+INFO:optim.lbfgs_modified:LS expected phi: -0.9378746264987236 (derphi0: -0.00028561302705160503)
+INFO:optim.lbfgs_modified:LS final step: 0.5
+INFO:optim.lbfgs_modified:LS expected phi: -0.9379883905645412 (derphi0: -0.00018433775892661472)
+INFO:optim.lbfgs_modified:LS final step: 0.5
+INFO:optim.lbfgs_modified:LS expected phi: -0.9380644371072211 (derphi0: -0.0001856166160433577)
+INFO:optim.lbfgs_modified:LS final step: 0.5
+INFO:optim.lbfgs_modified:LS expected phi: -0.9381424963949798 (derphi0: -0.00024089745492899352)
+INFO:optim.lbfgs_modified:LS final step: 0.5
+INFO:optim.lbfgs_modified:LS expected phi: -0.9382445725193023 (derphi0: -0.00035429980221173425)
+INFO:optim.lbfgs_modified:LS final step: 0.5
+INFO:optim.lbfgs_modified:LS expected phi: -0.9383954258381764 (derphi0: -0.0005664040931160387)
+INFO:optim.lbfgs_modified:LS final step: 0.5
+INFO:optim.lbfgs_modified:LS expected phi: -0.9386358809721734 (derphi0: -0.0009604060769018126)
+INFO:optim.lbfgs_modified:LS final step: 0.5
+INFO:optim.lbfgs_modified:LS expected phi: -0.9390397067486467 (derphi0: -0.002266421629514145)
+INFO:optim.lbfgs_modified:LS final step: 0.5
+INFO:optim.lbfgs_modified:LS expected phi: -0.9392744684223403 (derphi0: -0.0014164864069538406)
+INFO:optim.lbfgs_modified:LS final step: 0.5
+INFO:optim.lbfgs_modified:LS expected phi: -0.9398131833135592 (derphi0: -0.0007879195789094625)
+INFO:optim.lbfgs_modified:LS final step: 0.5
+INFO:optim.lbfgs_modified:LS expected phi: -0.9401376559192156 (derphi0: -0.0007372392054956239)
+INFO:optim.lbfgs_modified:LS final step: 0.5
+INFO:optim.lbfgs_modified:LS expected phi: -0.9404402873311938 (derphi0: -0.0006900673642487286)
+INFO:optim.lbfgs_modified:LS final step: 0.5
+INFO:optim.lbfgs_modified:LS expected phi: -0.9407272818740132 (derphi0: -0.001247271304963727)
+INFO:optim.lbfgs_modified:LS final step: 0.5
+INFO:optim.lbfgs_modified:LS expected phi: -0.9410055389211895 (derphi0: -0.0006650514016602778)
+INFO:optim.lbfgs_modified:LS final step: 0.5
+INFO:optim.lbfgs_modified:LS expected phi: -0.9412897822598321 (derphi0: -0.0010308763177323578)
+INFO:optim.lbfgs_modified:LS final step: 0.5
+INFO:optim.lbfgs_modified:LS expected phi: -0.9417308785010418 (derphi0: -0.0016981533279214931)
+INFO:optim.lbfgs_modified:LS final step: 0.5
+INFO:optim.lbfgs_modified:LS expected phi: -0.942445219142118 (derphi0: -0.002423255551923036)
+INFO:optim.lbfgs_modified:LS final step: 0.5
+INFO:optim.lbfgs_modified:LS expected phi: -0.9433679452165804 (derphi0: -0.002393354326757484)
+INFO:optim.lbfgs_modified:LS final step: 0.5
+INFO:optim.lbfgs_modified:LS expected phi: -0.9443804762702765 (derphi0: -0.005337477491619488)
+INFO:optim.lbfgs_modified:LS final step: 0.5
+INFO:optim.lbfgs_modified:LS expected phi: -0.9465624418506069 (derphi0: -0.008132372055904221)
+INFO:optim.lbfgs_modified:LS final step: 0.5
+INFO:optim.lbfgs_modified:LS expected phi: -0.9495573949301274 (derphi0: -0.013455629393241162)
+INFO:optim.lbfgs_modified:LS final step: 0.22236411060442277
+INFO:optim.lbfgs_modified:LS expected phi: -0.9513833063134525 (derphi0: -0.010232944243481059)
+INFO:optim.lbfgs_modified:LS final step: 0.5
+INFO:optim.lbfgs_modified:LS expected phi: -0.955103761722858 (derphi0: -0.011868923001544313)
+INFO:optim.lbfgs_modified:LS final step: 0.5
+INFO:optim.lbfgs_modified:LS expected phi: -0.958609264652719 (derphi0: -0.007281964588365027)
+INFO:optim.lbfgs_modified:LS final step: 0.5
+INFO:optim.lbfgs_modified:LS expected phi: -0.9617624981665063 (derphi0: -0.01684335406373112)
+INFO:optim.lbfgs_modified:LS final step: 0.5
+INFO:optim.lbfgs_modified:LS expected phi: -0.968441891221565 (derphi0: -0.01318289959007364)
+INFO:optim.lbfgs_modified:LS final step: 0.5
+INFO:optim.lbfgs_modified:LS expected phi: -0.9731588171937609 (derphi0: -0.025676026947591392)
+INFO:optim.lbfgs_modified:LS final step: 0.22763463422274685
+INFO:optim.lbfgs_modified:LS expected phi: -0.9761546127359393 (derphi0: -0.004908695312507597)
+INFO:optim.lbfgs_modified:LS final step: 0.5
+INFO:optim.lbfgs_modified:LS expected phi: -0.9782176964251398 (derphi0: -0.00563245626700743)
+INFO:optim.lbfgs_modified:LS final step: 0.5

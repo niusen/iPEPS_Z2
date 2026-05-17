@@ -6,7 +6,7 @@ import numpy
 import torch
 import yastn
 
-from ansatz.square_iPEPS import IPEPS_SQUARE, Cell_to_device, save_square_iPEPS
+from ansatz.square_iPEPS import CTM_detach, IPEPS_SQUARE, Cell_to_device, save_square_iPEPS
 from config.config import INITCTMARGS
 from ctmrg.bosonic_CTMRG_unitcell_iPEPS import Bosonic_CTMRG_cell_iPEPS
 from model.bosonic_square_ob_iPEPS import evaluate_ob_cell_iPEPS, evaluate_spin_cell_iPEPS
@@ -87,6 +87,9 @@ def get_random_grad(x0, delta):
 
 def cost_fun(parameters, state, ctm_args, energy_setting, global_args, config_kwargs, return_ctm_err=False):
     state.require_grad(True)
+    for key in state.A_set:
+        if getattr(state.A_set[key], "_data", None) is not None and state.A_set[key]._data.grad is not None:
+            state.A_set[key]._data.grad = None
     init = INITCTMARGS()
     CTM0 = None
     CTM_cell, double_A_cell, ite_num, ite_err = Bosonic_CTMRG_cell_iPEPS(state.A_set, init, CTM0, ctm_args, global_args)
@@ -116,7 +119,11 @@ def get_grad(parameters, state, ctm_args, energy_setting, global_args, config_kw
     for key in state.A_set:
         A_set_grad[key] = state.A_set[key].grad()
     state_grad = state.new_state(A_set_grad)
-    print("norm of grad:" + str(state_grad.norm()))
+    grad_norm = state_grad.norm()
+    print("norm of grad:" + str(grad_norm))
+    if not numpy.isfinite(grad_norm):
+        raise FloatingPointError("non-finite gradient norm")
+    CTM_cell = CTM_detach(CTM_cell, global_args)
     if return_ctm_err:
         return state_grad, E, CTM_cell, ite_err
     return state_grad, E, CTM_cell
@@ -160,6 +167,20 @@ def make_descent_direction(grad, direction):
         direction = scale_state(grad, -1.0)
         directional_derivative = state_inner(grad, direction)
     return direction, directional_derivative
+
+
+def clip_state_grad(grad, max_norm):
+    if max_norm is None:
+        return grad
+    max_norm = float(max_norm)
+    if not numpy.isfinite(max_norm) or max_norm <= 0:
+        return grad
+    norm = grad.norm()
+    if norm > max_norm:
+        scale = max_norm / norm
+        print("clip grad norm from " + str(norm) + " to " + str(max_norm))
+        return scale_state(grad, scale)
+    return grad
 
 
 def fx(parameters, state, CTM0, ls_ctm_args, energy_setting, global_args, config_kwargs, return_ctm_err=False):
@@ -241,10 +262,11 @@ def backtracking_line_search(parameters, x, direction, E0, E_min, grad, CTM_cell
     return best_x, best_E, alpha, False, None, None
 
 
-def _line_search_grad_eval(parameters, x, direction, alpha, AD_ctm_args, energy_setting, global_args, config_kwargs):
+def _line_search_grad_eval(parameters, x, direction, alpha, AD_ctm_args, energy_setting, global_args, config_kwargs, ls):
     x_trial = add_scaled_state(x, direction, alpha)
     x_trial.normalize()
     grad_trial, E_trial, CTM_trial, ite_err = get_grad(parameters, x_trial, AD_ctm_args, energy_setting, global_args, config_kwargs, return_ctm_err=True)
+    grad_trial = clip_state_grad(grad_trial, getattr(ls, "max_grad_norm", None))
     E_trial_float = _to_float(E_trial)
     dphi_trial = state_inner(grad_trial, direction)
     return x_trial, E_trial_float, grad_trial, dphi_trial, CTM_trial, ite_err
@@ -288,7 +310,7 @@ def hager_zhang_line_search(parameters, x, direction, E0, E_min, grad, CTM_cell,
     for ls_step in range(1, ls_maxiter + 1):
         print("Hager-Zhang line search step " + str(ls_step) + ", alpha=" + str(alpha))
         x_trial, E_trial, grad_trial, dphi_trial, CTM_trial, _ite_err = _line_search_grad_eval(
-            parameters, x, direction, alpha, AD_ctm_args, energy_setting, global_args, config_kwargs
+            parameters, x, direction, alpha, AD_ctm_args, energy_setting, global_args, config_kwargs, ls
         )
 
         if E_trial < best_E:
@@ -322,7 +344,7 @@ def hager_zhang_line_search(parameters, x, direction, E0, E_min, grad, CTM_cell,
                     break
                 print("Hager-Zhang zoom step " + str(zoom_step) + ", alpha=" + str(alpha))
                 x_trial, E_trial, grad_trial, dphi_trial, CTM_trial, _ite_err = _line_search_grad_eval(
-                    parameters, x, direction, alpha, AD_ctm_args, energy_setting, global_args, config_kwargs
+                    parameters, x, direction, alpha, AD_ctm_args, energy_setting, global_args, config_kwargs, ls
                 )
 
                 if E_trial < best_E:
@@ -389,6 +411,7 @@ def nonlinear_cg_opt(parameters, D, chi, x0, AD_ctm_args, ls_ctm_args, energy_se
         x.normalize()
         if grad is None:
             grad, E, CTM_cell = get_grad(parameters, x, AD_ctm_args, energy_setting, global_args, config_kwargs)
+            grad = clip_state_grad(grad, getattr(ls, "max_grad_norm", None))
             E_float = _to_float(E)
             gnorm = grad.norm()
 
@@ -416,6 +439,10 @@ def nonlinear_cg_opt(parameters, D, chi, x0, AD_ctm_args, ls_ctm_args, energy_se
         x = x_new
         if E_new < E_min:
             E_min = E_new
+        target_energy = getattr(ls, "target_energy", None)
+        if target_energy is not None and E_new <= target_energy:
+            print("target reached: E=" + str(E_new) + ", target=" + str(target_energy))
+            break
         if not accepted:
             direction_prev = None
             grad_prev = None
@@ -479,6 +506,7 @@ def lbfgs_opt(parameters, D, chi, x0, AD_ctm_args, ls_ctm_args, energy_setting, 
         x.normalize()
         if grad is None:
             grad, E, CTM_cell = get_grad(parameters, x, AD_ctm_args, energy_setting, global_args, config_kwargs)
+            grad = clip_state_grad(grad, getattr(ls, "max_grad_norm", None))
             E_float = _to_float(E)
             gnorm = grad.norm()
         if E_float < E_min:
@@ -492,6 +520,7 @@ def lbfgs_opt(parameters, D, chi, x0, AD_ctm_args, ls_ctm_args, energy_setting, 
         if accepted:
             if grad_new is None:
                 grad_new, E_grad_new, CTM_new = get_grad(parameters, x_new, AD_ctm_args, energy_setting, global_args, config_kwargs)
+                grad_new = clip_state_grad(grad_new, getattr(ls, "max_grad_norm", None))
                 E_new = _to_float(E_grad_new)
             s = subtract_state(x_new, x)
             y = subtract_state(grad_new, grad)
@@ -521,6 +550,10 @@ def lbfgs_opt(parameters, D, chi, x0, AD_ctm_args, ls_ctm_args, energy_setting, 
         x = x_new
         if E_new < E_min:
             E_min = E_new
+        target_energy = getattr(ls, "target_energy", None)
+        if target_energy is not None and E_new <= target_energy:
+            print("target reached: E=" + str(E_new) + ", target=" + str(target_energy))
+            break
         end_time = time.time()
         print("time consumed: " + time.strftime("%H hours, %M minuts, %S seconds", time.gmtime(end_time - start_time)))
         iteration += 1
@@ -543,6 +576,7 @@ def stochastic_opt(parameters, D, chi, x0, AD_ctm_args, ls_ctm_args, energy_sett
         print("optim iteration " + str(iteration))
         x.normalize()
         state_grad, E_grad, CTM_cell = get_grad(parameters, x, AD_ctm_args, energy_setting, global_args, config_kwargs)
+        state_grad = clip_state_grad(state_grad, getattr(ls, "max_grad_norm", None))
 
         if iteration == 1:
             E_min = E_grad.item()
@@ -563,6 +597,11 @@ def stochastic_opt(parameters, D, chi, x0, AD_ctm_args, ls_ctm_args, energy_sett
                     history_min_E = E_min
                     E_min = E_updated
                     _save_line_search_tensor_if_strict(x_updated, E_updated, history_min_E, ite_err, D, chi, config_kwargs)
+                    target_energy = getattr(ls, "target_energy", None)
+                    if target_energy is not None and E_updated <= target_energy:
+                        print("target reached: E=" + str(E_updated) + ", target=" + str(target_energy))
+                        x = x_updated
+                        return x
                     end_time = time.time()
                     print("time consumed: " + time.strftime("%H hours, %M minuts, %S seconds", time.gmtime(end_time - start_time)))
                     break

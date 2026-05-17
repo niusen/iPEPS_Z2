@@ -42,7 +42,7 @@ torch.set_num_threads(n_cpu)
 # J2=2cos(0.06pi)sin(0.14pi), lambda=2sin(0.06pi).
 # The paper's i*lambda*(P_ijkl-P_ijkl^-1) equals 2*lambda times
 # the sum of our four oriented scalar-chirality triangles.
-parameters = prl_129_177201_square_csl_parameters(chirality_sign=1.0)
+parameters = prl_129_177201_square_csl_parameters(chirality_sign=-1.0)
 print(parameters)
 
 
@@ -142,6 +142,7 @@ ls.method = opt_method
 ls.maxiter = 100
 ls.gtol = 1e-5
 ls.print_observables = True
+ls.max_grad_norm = 1.0
 
 if opt_method == "stochastic":
     ls.delta0 = 1e-3

@@ -15,10 +15,11 @@ from ansatz.square_iPEPS import (
     build_double_layer,
 )
 from config.settings import *
+from ctmrg.stable_linalg import stable_normalize, stable_projector_rsqrt, stable_svd, stable_svd_with_truncation
 
 
 def spectrum_conv_check(ss_old, C_new):
-    U, spec, V = yastn.linalg.svd(C_new, svd_on_cpu=True)
+    U, spec, V = stable_svd(C_new, svd_on_cpu=True)
     spec = spec.to_dense()
     ss_new = torch.diag(spec / spec[0, 0])
     ss_new = ss_new.to(ss_old.device)
@@ -244,11 +245,11 @@ def get_M(coord, direction, double_A_cell, Cset_cell, Tset_cell, ctm_setting, gl
     RMup = yastn.ncon([MMup, MMup_reflect], [[-3, -4, 1, 2], [1, 2, -1, -2]])
     RMlow = yastn.ncon([MMlow, MMlow_reflect], [[-1, -2, 1, 2], [1, 2, -3, -4]])
 
-    RMlow = RMlow / yastn.linalg.norm(RMlow)
-    RMup = RMup / yastn.linalg.norm(RMup)
+    RMlow = stable_normalize(RMlow)
+    RMup = stable_normalize(RMup)
 
     M = yastn.ncon([RMup, RMlow], [[-1, -2, 1, 2], [1, 2, -3, -4]])
-    M = M / yastn.linalg.norm(M)
+    M = stable_normalize(M)
 
     if ctm_setting.doublelayer_on_cpu:
         return M.to("cpu"), RMup.to("cpu"), RMlow.to("cpu")
@@ -294,21 +295,22 @@ def ctm_update_single_cx(cx, cy_max, Cset_cell, Tset_cell, double_A_cell, direct
             M, RMup, RMlow = get_M(coord, direction, double_A_cell, Cset_cell, Tset_cell, ctm_setting, global_args)
 
         chi_extra = 3
-        uM, sM, vM = yastn.linalg.svd_with_truncation(
+        uM, sM, vM = stable_svd_with_truncation(
             M.to(device),
             axes=((0, 1), (2, 3)),
             D_total=chi + chi_extra,
             svd_on_cpu=ctm_setting.svd_on_cpu,
             tol=ctm_setting.CTM_trun_tol,
             mask_f=truncation_f,
+            ctm_setting=ctm_setting,
         )
         if ctm_setting.doublelayer_on_cpu:
             uM = uM.to(device)
             sM = sM.to(device)
             vM = vM.to(device)
 
-        sM = sM / yastn.linalg.norm(sM)
-        sM_inv_sqrt = sM.rsqrt(cutoff=ctm_setting.CTM_trun_tol)
+        sM = stable_normalize(sM)
+        sM_inv_sqrt = stable_projector_rsqrt(sM, ctm_setting)
 
         vMp = vM.conj()
         if ctm_setting.doublelayer_on_cpu:
@@ -353,9 +355,9 @@ def ctm_update_single_cx(cx, cy_max, Cset_cell, Tset_cell, double_A_cell, direct
         pos = convert_cell_posit(coord[0], coord[1], 0, 3, direction, Lx, Ly)
         M7tem = yastn.ncon([C4, T3, PM_cell[_cell_key(pos[0], pos[1])]], [[1, 2], [-1, 3, 1], [2, 3, -2]])
 
-        M5tem = M5tem / yastn.linalg.norm(M5tem)
-        M1tem = M1tem / yastn.linalg.norm(M1tem)
-        M7tem = M7tem / yastn.linalg.norm(M7tem)
+        M5tem = stable_normalize(M5tem)
+        M1tem = stable_normalize(M1tem)
+        M7tem = stable_normalize(M7tem)
 
         pos = convert_cell_posit(coord[0], coord[1], 1, 2, direction, Lx, Ly)
         M5tem_cell[_cell_key(pos[0], pos[1])] = M5tem
