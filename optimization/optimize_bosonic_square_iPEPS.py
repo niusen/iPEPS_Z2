@@ -35,7 +35,7 @@ def _save_line_search_tensor_if_strict(state, E_trial, history_min_E, ite_err, D
     history_min_E_float = _to_float(history_min_E)
     ite_err_float = _ctmrg_err_to_float(ite_err)
     if (ite_err_float < 1e-2) and (E_trial_float < history_min_E_float):
-        filenm = "square_iPEPS_D" + str(D) + "_chi" + str(chi)
+        filenm = config_kwargs.get("save_file_prefix", "square_iPEPS_D" + str(D) + "_chi" + str(chi))
         save_square_iPEPS(state.A_set, filenm, config_kwargs)
         return True
     print(
@@ -82,7 +82,7 @@ def get_random_grad(x0, delta):
     A_set_new = OrderedDict()
     for key in x0.A_set:
         A_set_new[key] = random_tensor_sign(x0.A_set[key]) * delta
-    return IPEPS_SQUARE(A_set_new, x0.global_args)
+    return x0.new_state(A_set_new)
 
 
 def cost_fun(parameters, state, ctm_args, energy_setting, global_args, config_kwargs, return_ctm_err=False):
@@ -115,7 +115,7 @@ def get_grad(parameters, state, ctm_args, energy_setting, global_args, config_kw
     A_set_grad = OrderedDict()
     for key in state.A_set:
         A_set_grad[key] = state.A_set[key].grad()
-    state_grad = IPEPS_SQUARE(A_set_grad, state.global_args)
+    state_grad = state.new_state(A_set_grad)
     print("norm of grad:" + str(state_grad.norm()))
     if return_ctm_err:
         return state_grad, E, CTM_cell, ite_err
@@ -126,14 +126,14 @@ def state_axpy(state1, state2, coe1=1.0, coe2=1.0):
     A_set_new = OrderedDict()
     for key in state1.A_set:
         A_set_new[key] = state1.A_set[key] * coe1 + state2.A_set[key] * coe2
-    return IPEPS_SQUARE(A_set_new, state1.global_args)
+    return state1.new_state(A_set_new)
 
 
 def scale_state(state, coe):
     A_set_new = OrderedDict()
     for key in state.A_set:
         A_set_new[key] = state.A_set[key] * coe
-    return IPEPS_SQUARE(A_set_new, state.global_args)
+    return state.new_state(A_set_new)
 
 
 def add_scaled_state(state, direction, alpha):

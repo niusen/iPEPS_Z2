@@ -1,10 +1,8 @@
 import itertools
 import sys
-from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
-if str(REPO_ROOT) not in sys.path:
-    sys.path.append(str(REPO_ROOT))
+sys.path.append("/home/sniu/python_code/iPEPS_Z2_test_codex/")
+sys.path.append("D:/My Documents/Code/python_codes/iPEPS_Z2/")
 
 import torch
 

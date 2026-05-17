@@ -415,12 +415,7 @@ def Bosonic_CTMRG_cell_iPEPS(A_set, init, CTM0, ctm_setting, global_args):
     Tset_cell = CTM_cell["Tset"]
 
     if ctm_setting.trivial_initial_CTM:
-        Cset_cell = Cset_detach(Cset_cell, global_args)
-        Tset_cell = Tset_detach(Tset_cell, global_args)
-        with torch.no_grad():
-            Cset_cell_trivial, Tset_cell_trivial = initial_trivial_ctm(Cset_cell, Tset_cell, ctm_setting, global_args)
-        Cset_cell = Cset_requires_grad_(Cset_cell_trivial, global_args)
-        Tset_cell = Tset_requires_grad_(Tset_cell_trivial, global_args)
+        raise ValueError("bosonic square CTMRG should be initialized from PEPS contractions; set trivial_initial_CTM=False")
 
     ss_old1_cell = torch.ones((Lx, Ly, chi * 2), dtype=torch.float64, device=device)
     ss_old2_cell = torch.ones((Lx, Ly, chi * 2), dtype=torch.float64, device=device)

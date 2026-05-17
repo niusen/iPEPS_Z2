@@ -11,7 +11,7 @@ import numpy
 import torch
 
 from ansatz.square_iPEPS import (
-    IPEPS_SQUARE,
+    IPEPS_SQUARE_C4_PT,
     add_noise,
     load_square_iPEPS,
     random_square_iPEPS,
@@ -38,10 +38,7 @@ n_cpu = 20
 torch.set_num_threads(n_cpu)
 
 
-# PRL 129, 177201 (2022): J1=2cos(0.06pi)cos(0.14pi),
-# J2=2cos(0.06pi)sin(0.14pi), lambda=2sin(0.06pi).
-# The paper's i*lambda*(P_ijkl-P_ijkl^-1) equals 2*lambda times
-# the sum of our four oriented scalar-chirality triangles.
+# PRL 129, 177201 (2022), represented with the one-tensor C4/PT ansatz.
 parameters = prl_129_177201_square_csl_parameters(chirality_sign=1.0)
 print(parameters)
 
@@ -49,11 +46,12 @@ print(parameters)
 Noise = 0.0
 print("Noise=" + str(Noise))
 
-Lx = 2
-Ly = 2
+Lx = 1
+Ly = 1
 D = 3
 d = 2
 chi = 40
+checkerboard_spin_transform = "sigmay"  # options: "sigmax", "sigmay"
 
 
 AD_ctm_args = CTMARGS()
@@ -84,6 +82,8 @@ config_kwargs = {
     "default_device": device,
     "Lx": Lx,
     "Ly": Ly,
+    "checkerboard_spin_transform": checkerboard_spin_transform,
+    "save_file_prefix": "square_C4PT_iPEPS_D" + str(D) + "_chi" + str(chi),
 }
 
 global_args = GLOBALARGS()
@@ -93,14 +93,14 @@ global_args.device = config_kwargs["default_device"]
 
 
 load_initial_state = False
-initial_state_file = "square_iPEPS_D" + str(D) + "_chi" + str(chi)
+initial_state_file = config_kwargs["save_file_prefix"]
 
 if load_initial_state:
     A_set = load_square_iPEPS(initial_state_file, config_kwargs)
 else:
     A_set = random_square_iPEPS(D, d, config_kwargs)
 
-state = IPEPS_SQUARE(A_set, config_kwargs)
+state = IPEPS_SQUARE_C4_PT(A_set, config_kwargs, impose_c4=True, impose_pt=True)
 state = add_noise(state, Noise, config_kwargs)
 state.require_grad(False)
 state.to_device(config_kwargs["default_device"])

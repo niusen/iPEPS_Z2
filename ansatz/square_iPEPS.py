@@ -14,7 +14,8 @@ def _get_lattice_size(global_args):
 
 
 def _config_without_lattice(config_kwargs):
-    return {key: val for key, val in config_kwargs.items() if key not in ("Lx", "Ly")}
+    local_keys = ("Lx", "Ly", "checkerboard_spin_transform", "save_file_prefix")
+    return {key: val for key, val in config_kwargs.items() if key not in local_keys}
 
 
 def dense_config(config_kwargs):
@@ -63,6 +64,9 @@ class IPEPS_SQUARE():
                 A_double_set[key] = build_double_layer(Ap=self.A_set[key].conj(), A=self.A_set[key])
         return A_double_set
 
+    def new_state(self, A_set):
+        return IPEPS_SQUARE(A_set, self.global_args)
+
     def copy(self, preserve_grad=False):
         A_set_new = OrderedDict()
         for key in self.A_set:
@@ -70,7 +74,79 @@ class IPEPS_SQUARE():
                 A_set_new[key] = self.A_set[key].clone()
             else:
                 A_set_new[key] = self.A_set[key].copy()
-        return IPEPS_SQUARE(A_set_new, self.global_args)
+        return self.new_state(A_set_new)
+
+
+def rotate_square_tensor_C4(A, power=1):
+    power = power % 4
+    if power == 0:
+        return A
+    axes_list = {
+        1: (1, 2, 3, 0, 4),
+        2: (2, 3, 0, 1, 4),
+        3: (3, 0, 1, 2, 4),
+    }
+    A_rot = yastn.transpose(A, axes=axes_list[power])
+    if power % 2 == 1:
+        A_rot = A_rot.switch_signature(axes=(0, 1, 2, 3))
+    return A_rot
+
+
+def reflect_conjugate_square_tensor_PT(A):
+    A_pt = yastn.transpose(A, axes=(2, 1, 0, 3, 4)).conj()
+    return A_pt.switch_signature(axes=(0, 1, 2, 3, 4))
+
+
+def project_square_tensor_C4(A):
+    A_projected = rotate_square_tensor_C4(A, 0)
+    for power in range(1, 4):
+        A_projected = A_projected + rotate_square_tensor_C4(A, power)
+    return A_projected / 4.0
+
+
+def project_square_tensor_PT(A):
+    return (A + reflect_conjugate_square_tensor_PT(A)) / 2.0
+
+
+def project_square_tensor_C4_PT(A):
+    A_rot = rotate_square_tensor_C4(A, 0)
+    A_projected = A_rot + reflect_conjugate_square_tensor_PT(A_rot)
+    for power in range(1, 4):
+        A_rot = rotate_square_tensor_C4(A, power)
+        A_projected = A_projected + A_rot + reflect_conjugate_square_tensor_PT(A_rot)
+    return A_projected / 8.0
+
+
+class IPEPS_SQUARE_C4_PT(IPEPS_SQUARE):
+    def __init__(self, A_set, global_args, impose_c4=True, impose_pt=True):
+        self.impose_c4 = impose_c4
+        self.impose_pt = impose_pt
+        super().__init__(A_set, global_args)
+        self.project_symmetry()
+
+    def project_tensor(self, A):
+        if self.impose_c4 and self.impose_pt:
+            return project_square_tensor_C4_PT(A)
+        if self.impose_c4:
+            return project_square_tensor_C4(A)
+        if self.impose_pt:
+            return project_square_tensor_PT(A)
+        return A
+
+    def project_symmetry(self):
+        for cx in range(1, self.Lx + 1):
+            for cy in range(1, self.Ly + 1):
+                key = _cell_key(cx, cy)
+                self.A_set[key] = self.project_tensor(self.A_set[key])
+        return self
+
+    def normalize(self):
+        self.project_symmetry()
+        super().normalize()
+        return self
+
+    def new_state(self, A_set):
+        return IPEPS_SQUARE_C4_PT(A_set, self.global_args, impose_c4=self.impose_c4, impose_pt=self.impose_pt)
 
 
 def dense_tensor_from_array(T, config_kwargs, dual=None):

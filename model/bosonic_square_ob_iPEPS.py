@@ -53,6 +53,36 @@ def spin_matrices(device="cpu", dtype=torch.complex128):
     return Id, sx, sy, sz
 
 
+def pauli_matrix(name, device="cpu", dtype=torch.complex128):
+    name = str(name).lower()
+    if name in ("sigmax", "sigma_x", "x", "sx"):
+        return torch.tensor([[0.0, 1.0], [1.0, 0.0]], dtype=dtype, device=device)
+    if name in ("sigmay", "sigma_y", "y", "sy"):
+        return torch.tensor([[0.0, -1.0j], [1.0j, 0.0]], dtype=dtype, device=device)
+    raise ValueError("unknown checkerboard Pauli transform: " + str(name))
+
+
+def checkerboard_transform_name(config_kwargs):
+    transform = config_kwargs.get("checkerboard_spin_transform", None)
+    if transform is None or str(transform).lower() in ("none", "false", "0"):
+        return None
+    return transform
+
+
+def transform_operator_for_site(O, abs_pos, config_kwargs=None):
+    if config_kwargs is None:
+        config_kwargs = {}
+    transform = checkerboard_transform_name(config_kwargs)
+    if transform is None or (abs_pos[0] + abs_pos[1]) % 2 == 0:
+        return O
+    dtype = torch.complex128 if config_kwargs.get("default_dtype", "complex128") == "complex128" else torch.complex64
+    device = config_kwargs.get("default_device", "cpu")
+    U = pauli_matrix(transform, device=device, dtype=dtype)
+    O_dense = O.to_dense()
+    O_transformed = U.conj().T @ O_dense @ U
+    return dense_matrix_to_yastn(O_transformed, config_kwargs)
+
+
 OPERATOR_SVD_TOL = 1.0e-10
 RING_EXCHANGE_CHIRALITY_FACTOR = 2.0
 
@@ -228,6 +258,15 @@ def plaquette_positions(cx, cy, Lx, Ly):
     }
 
 
+def plaquette_absolute_positions(cx, cy):
+    return {
+        "LU": [cx + 1, cy + 1],
+        "RU": [cx + 2, cy + 1],
+        "LD": [cx + 1, cy + 2],
+        "RD": [cx + 2, cy + 2],
+    }
+
+
 def plaquette_AA(double_A_cell, positions):
     return {name: get_AA_simple(double_A_cell, pos) for name, pos in positions.items()}
 
@@ -238,50 +277,58 @@ def plaquette_norm(CTM, double_A_cell, cx, cy, Lx, Ly):
     return ob_2x2_iPEPS(CTM, AA["LU"], AA["RU"], AA["LD"], AA["RD"], cx, cy, Lx, Ly)
 
 
-def ob_factorized_2x2_raw(CTM, A_set, double_A_cell, ops_by_corner, cx, cy, Lx, Ly):
+def ob_factorized_2x2_raw(CTM, A_set, double_A_cell, ops_by_corner, cx, cy, Lx, Ly, config_kwargs=None):
+    if config_kwargs is None:
+        config_kwargs = {}
     pos = plaquette_positions(cx, cy, Lx, Ly)
+    abs_pos = plaquette_absolute_positions(cx, cy)
     AA = plaquette_AA(double_A_cell, pos)
     for corner, op in ops_by_corner.items():
-        AA[corner] = get_AA_with_operator(A_set, pos[corner], op)
+        op_site = transform_operator_for_site(op, abs_pos[corner], config_kwargs)
+        AA[corner] = get_AA_with_operator(A_set, pos[corner], op_site)
     return ob_2x2_iPEPS(CTM, AA["LU"], AA["RU"], AA["LD"], AA["RD"], cx, cy, Lx, Ly)
 
 
-def ob_factorized_2x2(CTM, A_set, double_A_cell, ops_by_corner, cx, cy, Lx, Ly):
-    ob = ob_factorized_2x2_raw(CTM, A_set, double_A_cell, ops_by_corner, cx, cy, Lx, Ly)
+def ob_factorized_2x2(CTM, A_set, double_A_cell, ops_by_corner, cx, cy, Lx, Ly, config_kwargs=None):
+    if config_kwargs is None:
+        config_kwargs = {}
+    ob = ob_factorized_2x2_raw(CTM, A_set, double_A_cell, ops_by_corner, cx, cy, Lx, Ly, config_kwargs)
     norm = plaquette_norm(CTM, double_A_cell, cx, cy, Lx, Ly)
     return _to_number(ob) / _to_number(norm)
 
 
-def ob_onsite_iPEPS(CTM, O, A_set, double_A_cell, cx, cy, Lx, Ly, corner="LU"):
-    return ob_factorized_2x2(CTM, A_set, double_A_cell, {corner: O}, cx, cy, Lx, Ly)
+def ob_onsite_iPEPS(CTM, O, A_set, double_A_cell, cx, cy, Lx, Ly, config_kwargs=None, corner="LU"):
+    return ob_factorized_2x2(CTM, A_set, double_A_cell, {corner: O}, cx, cy, Lx, Ly, config_kwargs)
 
 
-def nearest_neighbor_x_iPEPS(CTM, O1, O2, A_set, double_A_cell, cx, cy, Lx, Ly):
-    return ob_factorized_2x2(CTM, A_set, double_A_cell, {"LU": O1, "RU": O2}, cx, cy, Lx, Ly)
+def nearest_neighbor_x_iPEPS(CTM, O1, O2, A_set, double_A_cell, cx, cy, Lx, Ly, config_kwargs=None):
+    return ob_factorized_2x2(CTM, A_set, double_A_cell, {"LU": O1, "RU": O2}, cx, cy, Lx, Ly, config_kwargs)
 
 
-def nearest_neighbor_y_iPEPS(CTM, O1, O2, A_set, double_A_cell, cx, cy, Lx, Ly):
-    return ob_factorized_2x2(CTM, A_set, double_A_cell, {"RU": O1, "RD": O2}, cx, cy, Lx, Ly)
+def nearest_neighbor_y_iPEPS(CTM, O1, O2, A_set, double_A_cell, cx, cy, Lx, Ly, config_kwargs=None):
+    return ob_factorized_2x2(CTM, A_set, double_A_cell, {"RU": O1, "RD": O2}, cx, cy, Lx, Ly, config_kwargs)
 
 
-def next_nearest_neighbor_diag_a_iPEPS(CTM, O1, O2, A_set, double_A_cell, cx, cy, Lx, Ly):
-    return ob_factorized_2x2(CTM, A_set, double_A_cell, {"LU": O1, "RD": O2}, cx, cy, Lx, Ly)
+def next_nearest_neighbor_diag_a_iPEPS(CTM, O1, O2, A_set, double_A_cell, cx, cy, Lx, Ly, config_kwargs=None):
+    return ob_factorized_2x2(CTM, A_set, double_A_cell, {"LU": O1, "RD": O2}, cx, cy, Lx, Ly, config_kwargs)
 
 
-def next_nearest_neighbor_diag_b_iPEPS(CTM, O1, O2, A_set, double_A_cell, cx, cy, Lx, Ly):
-    return ob_factorized_2x2(CTM, A_set, double_A_cell, {"LD": O1, "RU": O2}, cx, cy, Lx, Ly)
+def next_nearest_neighbor_diag_b_iPEPS(CTM, O1, O2, A_set, double_A_cell, cx, cy, Lx, Ly, config_kwargs=None):
+    return ob_factorized_2x2(CTM, A_set, double_A_cell, {"LD": O1, "RU": O2}, cx, cy, Lx, Ly, config_kwargs)
 
 
-def ob_two_site_terms_iPEPS(CTM, A_set, double_A_cell, cx, cy, Lx, Ly, corners, svd_terms):
+def ob_two_site_terms_iPEPS(CTM, A_set, double_A_cell, cx, cy, Lx, Ly, corners, svd_terms, config_kwargs=None):
+    if config_kwargs is None:
+        config_kwargs = {}
     ob = None
     for op1, op2 in svd_terms:
-        term = ob_factorized_2x2_raw(CTM, A_set, double_A_cell, {corners[0]: op1, corners[1]: op2}, cx, cy, Lx, Ly)
+        term = ob_factorized_2x2_raw(CTM, A_set, double_A_cell, {corners[0]: op1, corners[1]: op2}, cx, cy, Lx, Ly, config_kwargs)
         ob = term if ob is None else ob + term
     norm = plaquette_norm(CTM, double_A_cell, cx, cy, Lx, Ly)
     return _to_number(ob) / _to_number(norm)
 
 
-def ob_three_site_iPEPS(CTM, O1, O2, O3, A_set, double_A_cell, cx, cy, Lx, Ly, corners=("LD", "RD", "RU")):
+def ob_three_site_iPEPS(CTM, O1, O2, O3, A_set, double_A_cell, cx, cy, Lx, Ly, config_kwargs=None, corners=("LD", "RD", "RU")):
     return ob_factorized_2x2(
         CTM,
         A_set,
@@ -291,10 +338,13 @@ def ob_three_site_iPEPS(CTM, O1, O2, O3, A_set, double_A_cell, cx, cy, Lx, Ly, c
         cy,
         Lx,
         Ly,
+        config_kwargs,
     )
 
 
-def ob_three_site_terms_iPEPS(CTM, A_set, double_A_cell, cx, cy, Lx, Ly, corners, svd_terms):
+def ob_three_site_terms_iPEPS(CTM, A_set, double_A_cell, cx, cy, Lx, Ly, corners, svd_terms, config_kwargs=None):
+    if config_kwargs is None:
+        config_kwargs = {}
     ob = None
     for op1, op2, op3 in svd_terms:
         term = ob_factorized_2x2_raw(
@@ -306,6 +356,7 @@ def ob_three_site_terms_iPEPS(CTM, A_set, double_A_cell, cx, cy, Lx, Ly, corners
             cy,
             Lx,
             Ly,
+            config_kwargs,
         )
         ob = term if ob is None else ob + term
     norm = plaquette_norm(CTM, double_A_cell, cx, cy, Lx, Ly)
@@ -323,31 +374,31 @@ def levi_civita(a, b, c):
 def ss_nearest_neighbor_x_iPEPS(CTM, A_set, double_A_cell, cx, cy, Lx, Ly, config_kwargs, svd_terms=None):
     if svd_terms is None:
         svd_terms = ss_svd_operators_dense(config_kwargs)
-    return ob_two_site_terms_iPEPS(CTM, A_set, double_A_cell, cx, cy, Lx, Ly, ("LU", "RU"), svd_terms)
+    return ob_two_site_terms_iPEPS(CTM, A_set, double_A_cell, cx, cy, Lx, Ly, ("LU", "RU"), svd_terms, config_kwargs)
 
 
 def ss_nearest_neighbor_y_iPEPS(CTM, A_set, double_A_cell, cx, cy, Lx, Ly, config_kwargs, svd_terms=None):
     if svd_terms is None:
         svd_terms = ss_svd_operators_dense(config_kwargs)
-    return ob_two_site_terms_iPEPS(CTM, A_set, double_A_cell, cx, cy, Lx, Ly, ("RU", "RD"), svd_terms)
+    return ob_two_site_terms_iPEPS(CTM, A_set, double_A_cell, cx, cy, Lx, Ly, ("RU", "RD"), svd_terms, config_kwargs)
 
 
 def ss_next_nearest_neighbor_diag_a_iPEPS(CTM, A_set, double_A_cell, cx, cy, Lx, Ly, config_kwargs, svd_terms=None):
     if svd_terms is None:
         svd_terms = ss_svd_operators_dense(config_kwargs)
-    return ob_two_site_terms_iPEPS(CTM, A_set, double_A_cell, cx, cy, Lx, Ly, ("LU", "RD"), svd_terms)
+    return ob_two_site_terms_iPEPS(CTM, A_set, double_A_cell, cx, cy, Lx, Ly, ("LU", "RD"), svd_terms, config_kwargs)
 
 
 def ss_next_nearest_neighbor_diag_b_iPEPS(CTM, A_set, double_A_cell, cx, cy, Lx, Ly, config_kwargs, svd_terms=None):
     if svd_terms is None:
         svd_terms = ss_svd_operators_dense(config_kwargs)
-    return ob_two_site_terms_iPEPS(CTM, A_set, double_A_cell, cx, cy, Lx, Ly, ("LD", "RU"), svd_terms)
+    return ob_two_site_terms_iPEPS(CTM, A_set, double_A_cell, cx, cy, Lx, Ly, ("LD", "RU"), svd_terms, config_kwargs)
 
 
 def chirality_triangle_iPEPS(CTM, A_set, double_A_cell, cx, cy, Lx, Ly, config_kwargs, corners=("LD", "RD", "RU"), svd_terms=None):
     if svd_terms is None:
         svd_terms = chirality_svd_operators_dense(config_kwargs)
-    return ob_three_site_terms_iPEPS(CTM, A_set, double_A_cell, cx, cy, Lx, Ly, corners, svd_terms)
+    return ob_three_site_terms_iPEPS(CTM, A_set, double_A_cell, cx, cy, Lx, Ly, corners, svd_terms, config_kwargs)
 
 
 def evaluate_spin_cell_iPEPS(A_set, double_A_cell, CTM_cell, config_kwargs, global_args):
@@ -359,9 +410,9 @@ def evaluate_spin_cell_iPEPS(A_set, double_A_cell, CTM_cell, config_kwargs, glob
     sz_set = torch.zeros(Lx, Ly, dtype=torch.complex128, device=device)
     for cx in range(1, Lx + 1):
         for cy in range(1, Ly + 1):
-            sx_set[cx - 1, cy - 1] = ob_onsite_iPEPS(CTM_cell, sx, A_set, double_A_cell, cx, cy, Lx, Ly)
-            sy_set[cx - 1, cy - 1] = ob_onsite_iPEPS(CTM_cell, sy, A_set, double_A_cell, cx, cy, Lx, Ly)
-            sz_set[cx - 1, cy - 1] = ob_onsite_iPEPS(CTM_cell, sz, A_set, double_A_cell, cx, cy, Lx, Ly)
+            sx_set[cx - 1, cy - 1] = ob_onsite_iPEPS(CTM_cell, sx, A_set, double_A_cell, cx, cy, Lx, Ly, config_kwargs)
+            sy_set[cx - 1, cy - 1] = ob_onsite_iPEPS(CTM_cell, sy, A_set, double_A_cell, cx, cy, Lx, Ly, config_kwargs)
+            sz_set[cx - 1, cy - 1] = ob_onsite_iPEPS(CTM_cell, sz, A_set, double_A_cell, cx, cy, Lx, Ly, config_kwargs)
     return sx_set, sy_set, sz_set
 
 
