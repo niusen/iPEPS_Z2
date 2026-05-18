@@ -8,6 +8,9 @@ python -u smoke_random_opt_C4PT_lbfgsmod.py \
   --maxiter 200 \
   --ctm-iters 80 \
   --ctm-conv-tol 1.0e-8 \
+  --ctm-trun-tol 1.0e-8 \
+  --projector-min-singular-cutoff 1.0e-6 \
+  --svd-ad-decomp-reg 1.0e-8 \
   --seed 0 \
   --instate-prefix ipepsz2_random_C4PT_init_D3_seed0 \
   --threads 4 \
@@ -17,4 +20,4 @@ python -u smoke_random_opt_C4PT_lbfgsmod.py \
   --line-search backtracking \
   --target-energy -0.98 \
   --check-every 1 \
-  --out-prefix general_C4PT_ansatz_matched80_lbfgsmod_from_saved_init_D3_chi40_seed0_$now >> general_C4PT_ansatz_matched80_lbfgsmod_from_saved_init_chi40_seed0_$now.out 2>> general_C4PT_ansatz_matched80_lbfgsmod_from_saved_init_chi40_seed0_$now.err &
+  --out-prefix general_C4PT_ansatz_matched80_lbfgsmod_stablecutoff_D3_chi40_seed0_$now >> general_C4PT_ansatz_matched80_lbfgsmod_stablecutoff_chi40_seed0_$now.out 2>> general_C4PT_ansatz_matched80_lbfgsmod_stablecutoff_chi40_seed0_$now.err &
