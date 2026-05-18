@@ -207,6 +207,7 @@ def compare_traces(juraj_npz, ipeps_npz):
 
 
 def main():
+    print("pid= " + str(os.getpid()))
     parser = argparse.ArgumentParser()
     parser.add_argument("--juraj-repo", default=JURAJ_REPO)
     parser.add_argument("--juraj-instate", required=True)

@@ -20,6 +20,7 @@ from ctmrg.bosonic_CTMRG_unitcell_iPEPS import Bosonic_CTMRG_cell_iPEPS
 from model.bosonic_square_ob_iPEPS import evaluate_spin_ob_cell_iPEPS
 
 
+print("pid= " + str(os.getpid()))
 torch.set_num_threads(4)
 
 Lx = 1

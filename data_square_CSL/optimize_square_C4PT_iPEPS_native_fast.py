@@ -332,6 +332,7 @@ def eval_state(raw_A, h2x2, ss_op, args):
 
 
 def main():
+    print("pid= " + str(os.getpid()))
     parser = argparse.ArgumentParser(
         description="Native iPEPS_Z2 fast C4/PT CSL optimizer using a one-site C4v single-layer CTMRG."
     )

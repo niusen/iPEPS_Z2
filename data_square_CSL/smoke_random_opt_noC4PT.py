@@ -15,6 +15,7 @@ from optimization.optimize_bosonic_square_iPEPS import optimize_bosonic_square_i
 
 
 def main():
+    print("pid= " + str(os.getpid()))
     parser = argparse.ArgumentParser()
     parser.add_argument("--D", type=int, default=3)
     parser.add_argument("--chi", type=int, default=40)

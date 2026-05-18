@@ -14,6 +14,7 @@ from model.bosonic_square_ob_iPEPS import prl_129_177201_square_csl_parameters
 from optimization.optimize_bosonic_square_iPEPS import cost_fun, get_grad, optimize_bosonic_square_iPEPS
 
 
+print("pid= " + str(os.getpid()))
 torch.set_num_threads(4)
 
 Lx = 2

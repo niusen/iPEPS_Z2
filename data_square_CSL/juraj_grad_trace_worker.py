@@ -8,6 +8,7 @@ import torch
 
 
 def main():
+    print("pid= " + str(os.getpid()))
     parser = argparse.ArgumentParser()
     parser.add_argument("--juraj-repo", default=r"D:\My Documents\Code\python_codes\Juraj\tn-torch_dev")
     parser.add_argument("--instate", required=True)

@@ -42,6 +42,7 @@ def to_real_float(x):
 
 
 def main():
+    print("pid= " + str(os.getpid()))
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--juraj-state",

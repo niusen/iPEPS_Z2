@@ -29,6 +29,7 @@ def square_to_juraj(A_square):
 
 
 def main():
+    print("pid= " + str(os.getpid()))
     parser = argparse.ArgumentParser()
     parser.add_argument("--juraj-trace", required=True)
     parser.add_argument("--out-npz", required=True)

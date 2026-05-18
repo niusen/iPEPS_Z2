@@ -118,6 +118,7 @@ def evaluate_state(state, model, cfg, chi, ctmrg_c4v, ENV_C4V, init_env, ctmrg_c
 
 
 def main():
+    print("pid= " + str(os.getpid()))
     parser = argparse.ArgumentParser(
         description="In-process fast C4/PT square CSL optimizer for iPEPS_Z2 states using Juraj's one-site C4v backend."
     )

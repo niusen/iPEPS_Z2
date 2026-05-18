@@ -54,6 +54,7 @@ def compress_values(T):
 
 
 def main():
+    print("pid= " + str(os.getpid()))
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--juraj-state",

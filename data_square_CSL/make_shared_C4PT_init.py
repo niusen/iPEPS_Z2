@@ -62,6 +62,7 @@ def write_juraj_c4v_state(A, path):
 
 
 def main():
+    print("pid= " + str(os.getpid()))
     parser = argparse.ArgumentParser()
     parser.add_argument("--D", type=int, default=3)
     parser.add_argument("--seed", type=int, default=0)

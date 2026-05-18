@@ -1,37 +1,13 @@
-#!/usr/bin/env bash
-set -euo pipefail
-
-# Run from the iPEPS_Z2 repository root:
-#   bash data_square_CSL/run_native_fast_C4PT_chi40_seed0.sh
-#
-# This is the fast C4/PT-specific iPEPS_Z2 optimizer. It imposes the
-# one-tensor C4/PT ansatz and uses the native fast code in this repo,
-# not Juraj's package.
-
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
-cd "${REPO_ROOT}"
-
-PYTHON_BIN="${PYTHON_BIN:-python}"
-
-STAMP="$(date +%Y%m%d_%H%M%S)"
-LOG_DIR="${REPO_ROOT}/data_square_CSL/logs"
-mkdir -p "${LOG_DIR}"
-
-LOG_FILE="${LOG_DIR}/native_fast_C4PT_D3_chi40_seed0_${STAMP}.log"
-OUT_PREFIX="data_square_CSL/native_fast_C4PT_D3_chi40_seed0_${STAMP}"
-
-echo "python: ${PYTHON_BIN}"
-echo "repo: ${REPO_ROOT}"
-echo "log: ${LOG_FILE}"
-echo "out_prefix: ${OUT_PREFIX}"
-
-"${PYTHON_BIN}" data_square_CSL/optimize_square_C4PT_iPEPS_native_fast.py \
+#!/bin/bash
+. /home/sniu/miniconda3/etc/profile.d/conda.sh
+conda activate pytorch
+now=$(date +'%Y_%m_%d_%H_%M_%S')
+python -u optimize_square_C4PT_iPEPS_native_fast.py \
   --mode opt \
   --random-init \
   --D 3 \
   --seed 0 \
-  --out-prefix "${OUT_PREFIX}" \
+  --out-prefix native_fast_C4PT_D3_chi40_seed0_$now \
   --chi 40 \
   --ctm-max-iter 80 \
   --ctm-conv-tol 1.0e-8 \
@@ -45,5 +21,4 @@ echo "out_prefix: ${OUT_PREFIX}"
   --check-every 1 \
   --threads 4 \
   --device cpu \
-  --dtype complex128 \
-  2>&1 | tee "${LOG_FILE}"
+  --dtype complex128 >> native_fast_C4PT_chi40_seed0_$now.out 2>> native_fast_C4PT_chi40_seed0_$now.err &

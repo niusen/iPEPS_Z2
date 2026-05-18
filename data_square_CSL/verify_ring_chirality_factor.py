@@ -1,4 +1,5 @@
 import itertools
+import os
 import sys
 
 sys.path.append("/home/sniu/python_code/iPEPS_Z2_test_codex/")
@@ -12,6 +13,7 @@ from model.bosonic_square_ob_iPEPS import (
 )
 
 
+print("pid= " + str(os.getpid()))
 dtype = torch.complex128
 device = "cpu"
 

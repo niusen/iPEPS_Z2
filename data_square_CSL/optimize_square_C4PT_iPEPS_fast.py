@@ -67,6 +67,7 @@ def run(cmd, cwd):
 
 
 def main():
+    print("pid= " + str(os.getpid()))
     parser = argparse.ArgumentParser(
         description="Fast C4/PT square CSL path using Juraj's one-site C4v single-layer CTMRG backend."
     )
