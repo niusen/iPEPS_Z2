@@ -2,16 +2,112 @@ import argparse
 import os
 import sys
 import time
+from collections import OrderedDict
 
+import numpy
 import torch
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append(r"D:\My Documents\Code\python_codes\iPEPS_Z2")
 
-from ansatz.square_iPEPS import IPEPS_SQUARE, load_square_iPEPS, random_square_iPEPS
+from ansatz.square_iPEPS import IPEPS_SQUARE, load_square_iPEPS, random_square_iPEPS, save_square_iPEPS
 from config.config import CTMARGS, GLOBALARGS, LINESEARCH
 from model.bosonic_square_ob_iPEPS import prl_129_177201_square_csl_parameters
-from optimization.optimize_bosonic_square_iPEPS import optimize_bosonic_square_iPEPS
+from optimization.lbfgs_modified import LBFGS_MOD
+from optimization.optimize_bosonic_square_iPEPS import cost_fun, optimize_bosonic_square_iPEPS
+
+
+def to_float(x):
+    if hasattr(x, "item"):
+        x = x.item()
+    return float(numpy.real(x))
+
+
+def make_state_from_params(template_state, params, detach=False):
+    A_set = OrderedDict()
+    for key in template_state.A_set:
+        data = params[key].detach().clone() if detach else params[key]
+        A_set[key] = template_state.A_set[key]._replace(data=data)
+    state = IPEPS_SQUARE(A_set, template_state.global_args)
+    state.normalize()
+    return state
+
+
+def optimize_with_lbfgsmod(parameters, D, chi, template_state, ad_ctm_args, ls_ctm_args, global_args, config_kwargs, args):
+    params = OrderedDict()
+    for key, tensor in template_state.A_set.items():
+        params[key] = torch.nn.Parameter(tensor._data.detach().clone())
+
+    line_search = None if args.line_search == "none" else args.line_search
+    optimizer = LBFGS_MOD(
+        list(params.values()),
+        max_iter=1,
+        lr=args.lr,
+        tolerance_grad=1.0e-5,
+        tolerance_change=1.0e-9,
+        history_size=args.history_size,
+        line_search_fn=line_search,
+        line_search_eps=1.0e-8,
+    )
+
+    best_energy = numpy.inf
+    start = time.perf_counter()
+
+    def grad_norm():
+        total = 0.0
+        for param in params.values():
+            if param.grad is not None:
+                total += float(torch.sum(torch.abs(param.grad) ** 2).detach().cpu())
+        return total ** 0.5
+
+    def closure(linesearching=False):
+        optimizer.zero_grad()
+        state = make_state_from_params(template_state, params)
+        loss, _ctm = cost_fun(parameters, state, ad_ctm_args, None, global_args, config_kwargs)
+        loss.backward()
+        if args.max_grad_norm and args.max_grad_norm > 0:
+            torch.nn.utils.clip_grad_norm_(list(params.values()), args.max_grad_norm)
+        norm = grad_norm()
+        print("norm of grad:" + str(norm))
+        if not numpy.isfinite(norm):
+            raise FloatingPointError("non-finite gradient norm")
+        return loss
+
+    @torch.no_grad()
+    def closure_linesearch(linesearching=True):
+        state = make_state_from_params(template_state, params)
+        loss, _ctm = cost_fun(parameters, state, ls_ctm_args, None, global_args, config_kwargs)
+        return loss
+
+    for step in range(1, args.maxiter + 1):
+        step_start = time.perf_counter()
+        loss_tensor = optimizer.step_2c(closure, closure_linesearch)
+        step_s = time.perf_counter() - step_start
+        loss_value = to_float(loss_tensor)
+        post_energy_value = float("nan")
+        with torch.no_grad():
+            post_state = make_state_from_params(template_state, params)
+            post_energy, _ctm = cost_fun(parameters, post_state, ls_ctm_args, None, global_args, config_kwargs)
+            post_energy_value = to_float(post_energy)
+            if post_energy_value < best_energy:
+                best_energy = post_energy_value
+                save_state = make_state_from_params(template_state, params, detach=True)
+                save_square_iPEPS(save_state.A_set, config_kwargs["save_file_prefix"], config_kwargs)
+        elapsed = time.perf_counter() - start
+        print(
+            f"step,{step},loss,{loss_value:.16g},post_energy,{post_energy_value:.16g},"
+            f"grad_norm,{grad_norm():.16g},step_s,{step_s:.6g},elapsed_s,{elapsed:.6g}"
+        )
+        if args.target_energy is not None and post_energy_value <= args.target_energy:
+            print(
+                f"target reached: E={post_energy_value}, target={args.target_energy}, "
+                f"step={step}, elapsed_s={elapsed:.6g}"
+            )
+            break
+
+    final_state = make_state_from_params(template_state, params, detach=True)
+    save_square_iPEPS(final_state.A_set, config_kwargs["save_file_prefix"], config_kwargs)
+    return final_state
 
 
 def main():
@@ -31,8 +127,11 @@ def main():
     parser.add_argument("--instate-prefix", default=None)
     parser.add_argument("--out-prefix", default=None)
     parser.add_argument("--step0", type=float, default=0.25)
+    parser.add_argument("--lr", type=float, default=0.5)
     parser.add_argument("--ls-maxiter", type=int, default=4)
     parser.add_argument("--history-size", type=int, default=4)
+    parser.add_argument("--line-search", choices=("backtracking", "strong_wolfe", "none"), default="backtracking")
+    parser.add_argument("--optimizer", choices=("old", "lbfgsmod"), default="old")
     parser.add_argument("--target-energy", type=float, default=None)
     args = parser.parse_args()
 
@@ -109,21 +208,25 @@ def main():
         f"maxiter={args.maxiter}, ad_ctm_iters={args.ad_ctm_iters}, "
         f"ls_ctm_iters={args.ls_ctm_iters}, seed={args.seed}, "
         f"max_grad_norm={args.max_grad_norm}, step0={args.step0}, "
-        f"ls_maxiter={args.ls_maxiter}, history_size={args.history_size}, "
+        f"lr={args.lr}, ls_maxiter={args.ls_maxiter}, history_size={args.history_size}, "
+        f"line_search={args.line_search}, optimizer={args.optimizer}, "
         f"target_energy={args.target_energy}, save_prefix={save_prefix}"
     )
-    optimize_bosonic_square_iPEPS(
-        parameters,
-        args.D,
-        args.chi,
-        state,
-        ad_ctm_args,
-        ls_ctm_args,
-        None,
-        global_args,
-        config_kwargs,
-        ls,
-    )
+    if args.optimizer == "lbfgsmod":
+        optimize_with_lbfgsmod(parameters, args.D, args.chi, state, ad_ctm_args, ls_ctm_args, global_args, config_kwargs, args)
+    else:
+        optimize_bosonic_square_iPEPS(
+            parameters,
+            args.D,
+            args.chi,
+            state,
+            ad_ctm_args,
+            ls_ctm_args,
+            None,
+            global_args,
+            config_kwargs,
+            ls,
+        )
     elapsed = time.perf_counter() - start
     print("elapsed_wall_s:", "{:.6g}".format(elapsed))
 
