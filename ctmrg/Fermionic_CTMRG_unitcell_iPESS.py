@@ -6,10 +6,9 @@ from collections import OrderedDict
 from config.settings import *
 from torch.utils.checkpoint import checkpoint
 from ansatz.triangle_iPESS import *
-from ctmrg.stable_linalg import stable_normalize, stable_projector_rsqrt, stable_svd, stable_svd_with_truncation
 
 def spectrum_conv_check(ss_old,C_new):
-    U,spec,V=stable_svd(C_new, svd_on_cpu=True)
+    U,spec,V=yastn.linalg.svd(C_new,  svd_on_cpu=True)
     spec=spec.to_dense();
     ss_new=torch.diag(spec/spec[0,0]);
     ss_new=ss_new.to(ss_old.device);
@@ -304,27 +303,27 @@ def Fermionic_CTMRG_cell_iPESS(B_set,T_set,init,CTM0, ctm_setting,global_args):
                     
                     print("cell position: "+str([cx,cy]))
                     print("corner 4:")
-                    uu,C4_spec,vv=stable_svd(Cset_cell[str(cx)+','+str(cy)]['C4'], axes=(0, 1), svd_on_cpu=True, ctm_setting=ctm_setting);
+                    uu,C4_spec,vv=yastn.linalg.svd(Cset_cell[str(cx)+','+str(cy)]['C4'], axes=(0, 1), svd_on_cpu=True);
                     C4_spec=C4_spec.to_dense();
                     C4_spec=torch.diag(C4_spec/C4_spec[0,0]);
                     C4_spec_cell[cx-1,cy-1,:]=C4_spec_cell[cx-1,cy-1,:]*0;
                     C4_spec_cell[cx-1,cy-1,range(0,len(C4_spec))]=C4_spec;
                     print("corner 1:")
-                    uu,C1_spec,vv=stable_svd(Cset_cell[str(cx)+','+str(cy)]['C1'], axes=(0, 1), svd_on_cpu=True, ctm_setting=ctm_setting);
+                    uu,C1_spec,vv=yastn.linalg.svd(Cset_cell[str(cx)+','+str(cy)]['C1'], axes=(0, 1), svd_on_cpu=True);
                     C1_spec=C1_spec.to_dense();
                     C1_spec=torch.diag(C1_spec/C1_spec[0,0]);
                     C1_spec_cell[cx-1,cy-1,:]=C1_spec_cell[cx-1,cy-1,:]*0;
                     C1_spec_cell[cx-1,cy-1,range(0,len(C1_spec))]=C1_spec;
                     print(C1_spec);
                     print("corner 3:")
-                    uu,C3_spec,vv=stable_svd(Cset_cell[str(cx)+','+str(cy)]['C3'], axes=(0, 1), svd_on_cpu=True, ctm_setting=ctm_setting);
+                    uu,C3_spec,vv=yastn.linalg.svd(Cset_cell[str(cx)+','+str(cy)]['C3'], axes=(0, 1), svd_on_cpu=True);
                     C3_spec=C3_spec.to_dense();
                     C3_spec=torch.diag(C3_spec/C3_spec[0,0]);
                     C3_spec_cell[cx-1,cy-1,:]=C3_spec_cell[cx-1,cy-1,:]*0;
                     C3_spec_cell[cx-1,cy-1,range(0,len(C3_spec))]=C3_spec;
                     print(C3_spec);
                     print("corner 2:")
-                    uu,C2_spec,vv=stable_svd(Cset_cell[str(cx)+','+str(cy)]['C2'], axes=(0, 1), svd_on_cpu=True, ctm_setting=ctm_setting);
+                    uu,C2_spec,vv=yastn.linalg.svd(Cset_cell[str(cx)+','+str(cy)]['C2'], axes=(0, 1), svd_on_cpu=True);
                     C2_spec=C2_spec.to_dense();
                     C2_spec=torch.diag(C2_spec/C2_spec[0,0]);
                     C2_spec_cell[cx-1,cy-1,:]=C2_spec_cell[cx-1,cy-1,:]*0;
@@ -370,28 +369,28 @@ def Fermionic_CTMRG_cell_iPESS(B_set,T_set,init,CTM0, ctm_setting,global_args):
                         
                         print("cell position: "+str([cx,cy]))
                         print("corner 4:")
-                        uu,C4_spec,vv=stable_svd(Cset_cell[str(cx)+','+str(cy)]['C4'], svd_on_cpu=True, ctm_setting=ctm_setting);
+                        uu,C4_spec,vv=yastn.linalg.svd(Cset_cell[str(cx)+','+str(cy)]['C4'], svd_on_cpu=True);
                         C4_spec=C4_spec.to_dense();
                         C4_spec=torch.diag(C4_spec/C4_spec[0,0]);
                         C4_spec_cell[cx-1,cy-1,:]=C4_spec_cell[cx-1,cy-1,:]*0;
                         C4_spec_cell[cx-1,cy-1,range(0,len(C4_spec))]=C4_spec;
                         print(C4_spec);
                         print("corner 1:")
-                        uu,C1_spec,vv=stable_svd(Cset_cell[str(cx)+','+str(cy)]['C1'], svd_on_cpu=True, ctm_setting=ctm_setting);
+                        uu,C1_spec,vv=yastn.linalg.svd(Cset_cell[str(cx)+','+str(cy)]['C1'], svd_on_cpu=True);
                         C1_spec=C1_spec.to_dense();
                         C1_spec=torch.diag(C1_spec/C1_spec[0,0]);
                         C1_spec_cell[cx-1,cy-1,:]=C1_spec_cell[cx-1,cy-1,:]*0;
                         C1_spec_cell[cx-1,cy-1,range(0,len(C1_spec))]=C1_spec;
                         print(C1_spec);
                         print("corner 3:")
-                        uu,C3_spec,vv=stable_svd(Cset_cell[str(cx)+','+str(cy)]['C3'], svd_on_cpu=True, ctm_setting=ctm_setting);
+                        uu,C3_spec,vv=yastn.linalg.svd(Cset_cell[str(cx)+','+str(cy)]['C3'], svd_on_cpu=True);
                         C3_spec=C3_spec.to_dense();
                         C3_spec=torch.diag(C3_spec/C3_spec[0,0]);
                         C3_spec_cell[cx-1,cy-1,:]=C3_spec_cell[cx-1,cy-1,:]*0;
                         C3_spec_cell[cx-1,cy-1,range(0,len(C3_spec))]=C3_spec;
                         print(C3_spec);
                         print("corner 2:")
-                        uu,C2_spec,vv=stable_svd(Cset_cell[str(cx)+','+str(cy)]['C2'], svd_on_cpu=True, ctm_setting=ctm_setting);
+                        uu,C2_spec,vv=yastn.linalg.svd(Cset_cell[str(cx)+','+str(cy)]['C2'], svd_on_cpu=True);
                         C2_spec=C2_spec.to_dense();
                         C2_spec=torch.diag(C2_spec/C2_spec[0,0]);
                         C2_spec_cell[cx-1,cy-1,:]=C2_spec_cell[cx-1,cy-1,:]*0;
@@ -653,12 +652,14 @@ def get_M(coord,direction,double_B_cell,double_T_cell,Cset_cell,Tset_cell, ctm_s
     # RMlow=MMlow*MMlow_reflect;
     RMlow = yastn.ncon([MMlow, MMlow_reflect], [[-1,-2,1,2], [1,2,-3,-4]]);
 
-    RMlow=stable_normalize(RMlow);
-    RMup=stable_normalize(RMup);
+    RMlow_norm=yastn.linalg.norm(RMlow);
+    RMlow= RMlow/RMlow_norm;
+    RMup_norm=yastn.linalg.norm(RMup);
+    RMup= RMup/RMup_norm;
 
     # M=RMup*RMlow;
     M = yastn.ncon([RMup, RMlow], [[-1,-2,1,2], [1,2,-3,-4]]);
-    M=stable_normalize(M);
+    M=M/(yastn.linalg.norm(M));
 
     if ctm_setting.doublelayer_on_cpu:
         return M.to('cpu'),RMup.to('cpu'),RMlow.to('cpu')
@@ -792,7 +793,7 @@ def ctm_update_single_cx(cx,cy_max, Cset_cell, Tset_cell, double_B_cell,double_T
 
         # uM,sM,vM = yastn.linalg.svd_with_truncation(M, axes=((0, 1), (2, 3)), D_total=chi+chi_extra,svd_on_cpu=True, truncate_multiplets=True, tol=ctm_setting.CTM_trun_tol);
 
-        uM,sM,vM = stable_svd_with_truncation(M.to(global_args.device), axes=((0, 1), (2, 3)), D_total=chi+chi_extra, svd_on_cpu=ctm_setting.svd_on_cpu, tol=ctm_setting.CTM_trun_tol, mask_f=truncation_f, ctm_setting=ctm_setting);
+        uM,sM,vM = yastn.linalg.svd_with_truncation(M.to(global_args.device), axes=((0, 1), (2, 3)), D_total=chi+chi_extra, svd_on_cpu=ctm_setting.svd_on_cpu, tol=ctm_setting.CTM_trun_tol, mask_f=truncation_f);
         if ctm_setting.doublelayer_on_cpu:#send back to gpu 
             uM=uM.to(global_args.device);
             sM=sM.to(global_args.device);
@@ -809,11 +810,12 @@ def ctm_update_single_cx(cx,cy_max, Cset_cell, Tset_cell, double_B_cell,double_T
 
 
 
-        sM=stable_normalize(sM);
+        sM_norm=yastn.linalg.norm(sM);
+        sM=sM/sM_norm;
         
         #sM_inv_sqrt=sdiag_inv_sqrt(sM);
         # sM_inv_sqrt=sM.rsqrt(cutoff=1e-10);
-        sM_inv_sqrt=stable_projector_rsqrt(sM, ctm_setting);
+        sM_inv_sqrt=sM.rsqrt(cutoff=ctm_setting.CTM_trun_tol);
         # sM_inv_sqrt=sM_inv_sqrt.rsqrt(cutoff=1e-10);
         #sM_inv_sqrt_1d,bb=yastn.Tensor.compress_to_1d(sM_inv_sqrt);
         #print(sM_inv_sqrt_1d)
@@ -872,9 +874,13 @@ def ctm_update_single_cx(cx,cy_max, Cset_cell, Tset_cell, double_B_cell,double_T
         #@tensor M7tem[:]:=C4[1,2]*T3[-1,3,1]*PM_cell[Pos[1-1]][Pos[2-1]][2,3,-2];
         M7tem = yastn.ncon([C4, T3, PM_cell[str(Pos[1-1])+','+str(Pos[2-1])]], [[1,2], [-1,3,1], [2,3,-2]]);
 
-        M5tem=stable_normalize(M5tem);
-        M1tem=stable_normalize(M1tem);
-        M7tem=stable_normalize(M7tem);
+        M5tem_norm=yastn.linalg.norm(M5tem);
+        M1tem_norm=yastn.linalg.norm(M1tem);
+        M7tem_norm=yastn.linalg.norm(M7tem);
+
+        M5tem=M5tem/M5tem_norm;
+        M1tem=M1tem/M1tem_norm;
+        M7tem=M7tem/M7tem_norm;
 
         Pos=convert_cell_posit(coord[1-1],coord[2-1],1,2,direction, Lx,Ly);
         #M5tem_cell[Pos[1-1]][Pos[2-1]]=M5tem;

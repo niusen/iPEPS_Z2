@@ -66,9 +66,6 @@ def main():
     parser.add_argument("--line-search", choices=("backtracking", "strong_wolfe", "none"), default="backtracking")
     parser.add_argument("--target-energy", type=float, default=None)
     parser.add_argument("--check-every", type=int, default=1)
-    parser.add_argument("--ctm-trun-tol", type=float, default=1.0e-8)
-    parser.add_argument("--projector-min-singular-cutoff", type=float, default=1.0e-8)
-    parser.add_argument("--svd-ad-decomp-reg", type=float, default=1.0e-8)
     args = parser.parse_args()
 
     torch.set_num_threads(args.threads)
@@ -110,19 +107,11 @@ def main():
     ctm_args = CTMARGS()
     ctm_args.chi = args.chi
     ctm_args.CTM_ite_nums = args.ctm_iters
-    ctm_args.CTM_trun_tol = args.ctm_trun_tol
+    ctm_args.CTM_trun_tol = 1.0e-8
     ctm_args.CTM_conv_tol = args.ctm_conv_tol
     ctm_args.CTM_ite_info = False
     ctm_args.doublelayer_on_cpu = False
     ctm_args.use_sub_checkpoint = False
-    ctm_args.projector_min_singular_cutoff = args.projector_min_singular_cutoff
-    ctm_args.svd_ad_decomp_reg = args.svd_ad_decomp_reg
-
-    print(
-        f"ctm params: trun_tol={ctm_args.CTM_trun_tol}, "
-        f"projector_min_singular_cutoff={ctm_args.projector_min_singular_cutoff}, "
-        f"svd_ad_decomp_reg={ctm_args.svd_ad_decomp_reg}"
-    )
 
     line_search = None if args.line_search == "none" else args.line_search
     optimizer = LBFGS_MOD(

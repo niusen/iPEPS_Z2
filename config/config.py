@@ -55,7 +55,6 @@ class LINESEARCH():
         self.c1=1e-4
         self.min_step=1e-12
         self.history_size=8
-        self.max_grad_norm=None
         self.cg_beta='PRP'
         self.hz_delta=0.1
         self.hz_sigma=0.9
@@ -107,9 +106,6 @@ class CTMARGS():
         self.CTM_trun_svd = False
         self.CTM_trun_tol = 1.0e-10
         self.svd_lanczos_tol = 1e-10
-        self.svd_ad_decomp_reg = 1.0e-8
-        self.svd_fix_signs = True
-        self.projector_min_singular_cutoff = 1.0e-8
         self.CTM_ite_info = False
         self.construct_double_layer=True;
         self.doublelayer_on_cpu=False;
