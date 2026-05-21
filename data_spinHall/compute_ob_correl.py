@@ -57,6 +57,7 @@ init=INITCTMARGS()
 # config_kwargs = {"backend": "np"}
 #device: 'cpu', 'cuda'
 config_kwargs = {"backend": 'torch', "default_dtype": 'complex128', 'default_device': 'cpu', 'Lx':Lx, 'Ly':Ly}
+global_args.device=config_kwargs['default_device'];
 
 filenm='Z2_D8_chi80_-1.1634';
 B_set,T_set=load_triangle_iPESS(filenm,config_kwargs);

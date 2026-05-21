@@ -57,12 +57,13 @@ init=INITCTMARGS()
 # config_kwargs = {"backend": "np"}
 #device: 'cpu', 'cuda'
 config_kwargs = {"backend": 'torch', "default_dtype": 'complex128', 'default_device': 'cuda', 'Lx':Lx, 'Ly':Ly}
+global_args.device=config_kwargs['default_device'];
 
 filenm='SU_iPESS_Z2_csl_D'+str(D);
 B_set,T_set=load_triangle_iPESS(filenm,config_kwargs);
 state=IPESS_TRIANGLE(B_set,T_set,config_kwargs)
 state.require_grad(False)
-state.to_device('cuda')
+state.to_device(global_args.device)
 state.normalize()
 
 
@@ -122,4 +123,3 @@ with torch.no_grad():
 
 
         
-
