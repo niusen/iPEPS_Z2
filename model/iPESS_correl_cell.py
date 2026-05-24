@@ -123,7 +123,7 @@ def solve_correl_length_simple(n_values,CTM_cell,direction, Lx,Ly, config_kwargs
                 if yastn.linalg.norm(vl_init)>0:
                     vl_init=vl_init/yastn.linalg.norm(vl_init)
                     #eu,_=eigsolve(correl_TransOp_fx, vl_init, n_values,:LM,Arnoldi());
-                    eu,_=yastn.eigs(correl_Trans_fx, vl_init, k=n_values, which='LM', ncv=10)
+                    eu,_=yastn.eigs(correl_Trans_fx, vl_init, k=n_values, which='LM', ncv=max(10, n_values + 5))
                     eu_set[cq]=eu.cpu().numpy();
                 else:
                     eu_set[cq]=[];
@@ -277,7 +277,7 @@ def cal_correl(CTM_cell,B_set,T_set,B_double_set, T_double_set,D,chi,direction,d
     CdagC_ob_set=numpy.zeros((len(x_range),len(y_range),distance),dtype=numpy.complex128);
 
     if direction=="x":
-        n_values=10;
+        n_values=200;
         eu_x_cell,Q_set=solve_correl_length_simple(n_values,CTM_cell,"x",Lx,Ly,config_kwargs,partly);
 
         for cb in y_range:
@@ -366,7 +366,7 @@ def cal_correl_spin_resolved(CTM_cell,B_set,T_set,B_double_set, T_double_set,D,c
     def cal_CdagC(x_range,y_range,distance,direction, Lx,Ly,CTM_cell,config_kwargs,partly,B_set,T_set,B_double_set, T_double_set, Cdag, C, CdagC_string):
         CdagC_ob_set=numpy.zeros((len(x_range),len(y_range),distance),dtype=numpy.complex128);
         if direction=="x":
-            n_values=10;
+            n_values=200;
             eu_x_cell,Q_set=solve_correl_length_simple(n_values,CTM_cell,"x",Lx,Ly,config_kwargs,partly);
 
             for cb in y_range:
@@ -401,7 +401,7 @@ def cal_correl_spin_resolved(CTM_cell,B_set,T_set,B_double_set, T_double_set,D,c
     SS_ob_set=numpy.zeros((len(x_range),len(y_range),distance),dtype=numpy.complex128);
 
     if direction=="x":
-        n_values=10;
+        n_values=200;
         eu_x_cell,Q_set=solve_correl_length_simple(n_values,CTM_cell,"x",Lx,Ly,config_kwargs,partly);
 
         for cb in y_range:
@@ -464,7 +464,7 @@ def cal_correl_spinless(CTM_cell,B_set,T_set,B_double_set, T_double_set,D,chi,di
     CdagC_ob_set=numpy.zeros((len(x_range),len(y_range),distance),dtype=numpy.complex128);
 
     if direction=="x":
-        n_values=10;
+        n_values=200;
         eu_x_cell,Q_set=solve_correl_length_simple(n_values,CTM_cell,"x",Lx,Ly,config_kwargs,partly);
 
         for cb in y_range:

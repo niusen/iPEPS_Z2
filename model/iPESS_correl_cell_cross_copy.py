@@ -370,7 +370,7 @@ def cal_correl_density_cross_copy(
         x_range = range(1, Lx + 1)
         y_range = range(1, Ly + 1)
 
-    n_values = 10
+    n_values = 200
     eu_x_cell, Q_set = solve_correl_length_simple(n_values, CTM_cell, direction, Lx, Ly, config_kwargs, partly)
 
     NupNdn_set = _cal_density_cross(
@@ -449,7 +449,7 @@ def cal_correl_spin_resolved_cross_copy(
         x_range = range(1, Lx + 1)
         y_range = range(1, Ly + 1)
 
-    n_values = 10
+    n_values = 200
     eu_x_cell, Q_set = solve_correl_length_simple(n_values, CTM_cell, direction, Lx, Ly, config_kwargs, partly)
 
     # up_dn is <c_up^\dagger(0) c_down(r)>; dn_up is <c_down^\dagger(0) c_up(r)>.
