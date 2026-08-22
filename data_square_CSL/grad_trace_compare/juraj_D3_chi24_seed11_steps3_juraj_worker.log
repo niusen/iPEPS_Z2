@@ -1,0 +1,6 @@
+INFO:optim.lbfgs_modified:LS expected phi: -0.7507656519588589 (derphi0: -1.8248409508533374)
+INFO:optim.lbfgs_modified:LS final step: 0.046580890868630855
+INFO:optim.lbfgs_modified:LS expected phi: -0.77906226644908 (derphi0: -0.03240751943839437)
+INFO:optim.lbfgs_modified:LS final step: 0.5
+INFO:optim.lbfgs_modified:LS expected phi: -0.792308800678559 (derphi0: -0.0349074886160734)
+INFO:optim.lbfgs_modified:LS final step: 0.5

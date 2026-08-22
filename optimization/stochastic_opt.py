@@ -35,6 +35,32 @@ def _save_line_search_tensor_if_strict(state, E_trial, history_min_E, ite_err, D
     return False
 
 
+def _clear_tensor_grad(tensor):
+    if getattr(tensor, "_data", None) is not None and tensor._data.grad is not None:
+        tensor._data.grad = None
+
+
+def _clear_state_grads(state):
+    for key in state.B_set:
+        _clear_tensor_grad(state.B_set[key])
+        _clear_tensor_grad(state.T_set[key])
+
+
+def _assert_finite_grad(state_grad):
+    grad_norm = state_grad.norm()
+    if not numpy.isfinite(grad_norm):
+        raise FloatingPointError("non-finite gradient norm")
+
+
+def clip_state_grad(grad, max_norm):
+    if max_norm is None or not numpy.isfinite(max_norm) or max_norm <= 0:
+        return grad
+    norm = grad.norm()
+    if norm > max_norm:
+        return scale_state(grad, max_norm / (norm + 1.0e-30))
+    return grad
+
+
 def random_tensor_sign(T):
     T=T.copy();
     data_1d,bb=yastn.Tensor.compress_to_1d(T);
@@ -76,6 +102,7 @@ def get_random_grad(x0,delta):
 ####################################
 
 def cost_fun(parameters,state, ctm_args, energy_setting, global_args, config_kwargs, return_ctm_err=False):
+    _clear_state_grads(state)
     state.require_grad(True)
     B_set=state.B_set
     T_set=state.T_set
@@ -118,6 +145,8 @@ def get_grad(parameters,state, ctm_args, energy_setting, global_args, config_kwa
         B_set_grad.update({key: state.B_set[key].grad()})
         T_set_grad.update({key: state.T_set[key].grad()})
     state_grad=IPESS_TRIANGLE(B_set_grad, T_set_grad, state.global_args);
+    _assert_finite_grad(state_grad)
+    CTM_cell=CTM_detach(CTM_cell, global_args)
     print("norm of grad:"+str(state_grad.norm()));
     if return_ctm_err:
         return state_grad,E,CTM_cell,ite_err
@@ -287,10 +316,11 @@ def backtracking_line_search(parameters, x, direction, E0, E_min, grad, CTM_cell
     return best_x,best_E,alpha,False,None,None
 
 
-def _line_search_grad_eval(parameters, x, direction, alpha, AD_ctm_args, energy_setting, global_args, config_kwargs):
+def _line_search_grad_eval(parameters, x, direction, alpha, AD_ctm_args, energy_setting, global_args, config_kwargs, ls=None):
     x_trial=add_scaled_state(x,direction,alpha)
     x_trial.normalize()
     grad_trial,E_trial,CTM_trial,ite_err=get_grad(parameters, x_trial, AD_ctm_args, energy_setting, global_args, config_kwargs, return_ctm_err=True)
+    grad_trial=clip_state_grad(grad_trial, getattr(ls, "max_grad_norm", None))
     E_trial_float=_to_float(E_trial)
     dphi_trial=state_inner(grad_trial,direction)
     return x_trial,E_trial_float,grad_trial,dphi_trial,CTM_trial,ite_err
@@ -335,7 +365,7 @@ def hager_zhang_line_search(parameters, x, direction, E0, E_min, grad, CTM_cell,
     for ls_step in range(1,ls_maxiter+1):
         print('Hager-Zhang line search step '+str(ls_step)+', alpha='+str(alpha))
         x_trial,E_trial,grad_trial,dphi_trial,CTM_trial,_ite_err=_line_search_grad_eval(
-            parameters,x,direction,alpha,AD_ctm_args,energy_setting,global_args,config_kwargs)
+            parameters,x,direction,alpha,AD_ctm_args,energy_setting,global_args,config_kwargs,ls)
 
         if E_trial<best_E:
             best_x=x_trial
@@ -366,7 +396,7 @@ def hager_zhang_line_search(parameters, x, direction, E0, E_min, grad, CTM_cell,
                     break
                 print('Hager-Zhang zoom step '+str(zoom_step)+', alpha='+str(alpha))
                 x_trial,E_trial,grad_trial,dphi_trial,CTM_trial,_ite_err=_line_search_grad_eval(
-                    parameters,x,direction,alpha,AD_ctm_args,energy_setting,global_args,config_kwargs)
+                    parameters,x,direction,alpha,AD_ctm_args,energy_setting,global_args,config_kwargs,ls)
 
                 if E_trial<best_E:
                     best_x=x_trial
@@ -434,6 +464,7 @@ def nonlinear_cg_opt(parameters, D,chi, x0, AD_ctm_args, ls_ctm_args, energy_set
         x.normalize()
         if grad is None:
             grad,E,CTM_cell=get_grad(parameters, x, AD_ctm_args, energy_setting, global_args, config_kwargs)
+            grad=clip_state_grad(grad, getattr(ls, "max_grad_norm", None))
             E_float=_to_float(E)
             gnorm=grad.norm()
 
@@ -524,6 +555,7 @@ def lbfgs_opt(parameters, D,chi, x0, AD_ctm_args, ls_ctm_args, energy_setting, g
         x.normalize()
         if grad is None:
             grad,E,CTM_cell=get_grad(parameters, x, AD_ctm_args, energy_setting, global_args, config_kwargs)
+            grad=clip_state_grad(grad, getattr(ls, "max_grad_norm", None))
             E_float=_to_float(E)
             gnorm=grad.norm()
         if E_float<E_min:
@@ -537,6 +569,7 @@ def lbfgs_opt(parameters, D,chi, x0, AD_ctm_args, ls_ctm_args, energy_setting, g
         if accepted:
             if grad_new is None:
                 grad_new,E_grad_new,CTM_new=get_grad(parameters, x_new, AD_ctm_args, energy_setting, global_args, config_kwargs)
+                grad_new=clip_state_grad(grad_new, getattr(ls, "max_grad_norm", None))
                 E_new=_to_float(E_grad_new)
             s=subtract_state(x_new,x)
             y=subtract_state(grad_new,grad)
@@ -604,6 +637,7 @@ def stochastic_opt(parameters, D,chi, x0, AD_ctm_args, ls_ctm_args, energy_setti
         print("optim iteration "+str(iter))
         x.normalize();
         state_grad,E_grad, CTM_cell=get_grad(parameters, x, AD_ctm_args, energy_setting, global_args, config_kwargs);
+        state_grad=clip_state_grad(state_grad, getattr(ls, "max_grad_norm", None))
         
         if iter==1:
             E_min=E_grad.item();
