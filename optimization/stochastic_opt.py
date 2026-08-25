@@ -3,7 +3,14 @@ import yastn
 import numpy,torch
 from ansatz.triangle_iPESS import *
 from ctmrg.Fermionic_CTMRG_unitcell_iPESS import *
+from ctmrg.CTMRG_unitcell_iPESS import CTMRG_cell_iPESS as Bosonic_CTMRG_cell_iPESS
 from model.fermion_ob_iPESS import *
+from ansatz.bosonic_triangle_iPESS import save_bosonic_triangle_iPESS
+from ansatz.fermionic_spin_triangle_iPESS import (
+    save_fermionic_spin_triangle_iPESS,
+)
+from model.bosonic_spin_ob_iPESS import evaluate_triangle_spin_energy
+from model.fermionic_spin_ob_iPESS import evaluate_fermionic_triangle_spin_energy
 from config.settings import *
 from config.config import *
 import time
@@ -28,8 +35,29 @@ def _save_line_search_tensor_if_strict(state, E_trial, history_min_E, ite_err, D
     history_min_E_float=_to_float(history_min_E)
     ite_err_float=_ctmrg_err_to_float(ite_err)
     if (ite_err_float<1e-2) and (E_trial_float<history_min_E_float):
-        filenm='Z2_D'+str(D)+'_chi'+str(chi)
-        save_triangle_iPESS(state.B_set, state.T_set, filenm, config_kwargs)
+        if state.B_set['1,1'].config.fermionic:
+            physical_leg=state.T_set['1,1'].get_legs(axes=1)
+            physical_charges=tuple(
+                int(charge[0]) if isinstance(charge, tuple) else int(charge)
+                for charge in physical_leg.t
+            )
+            if physical_charges == (1,) and tuple(physical_leg.D) == (2,):
+                filenm=config_kwargs.get(
+                    'save_file_prefix',
+                    'triangle_spin_fermionic_D'+str(D)+'_chi'+str(chi),
+                )
+                save_fermionic_spin_triangle_iPESS(
+                    state.B_set, state.T_set, filenm, config_kwargs
+                )
+            else:
+                # Preserve the old Hofstadter-Hubbard filename and format.
+                filenm='Z2_D'+str(D)+'_chi'+str(chi)
+                save_triangle_iPESS(state.B_set, state.T_set, filenm, config_kwargs)
+        else:
+            filenm=config_kwargs.get(
+                'save_file_prefix', 'triangle_spin_D'+str(D)+'_chi'+str(chi)
+            )
+            save_bosonic_triangle_iPESS(state.B_set, state.T_set, filenm, config_kwargs)
         return True
     print('skip saving tensor: CTMRG err='+str(ite_err_float)+', E='+str(E_trial_float)+', history min E='+str(history_min_E_float))
     return False
@@ -108,7 +136,10 @@ def cost_fun(parameters,state, ctm_args, energy_setting, global_args, config_kwa
     T_set=state.T_set
     init=INITCTMARGS()
     CTM0=None;
-    CTM_cell, double_B_set,double_T_set,ite_num,ite_err=Fermionic_CTMRG_cell_iPESS(B_set,T_set,init,CTM0, ctm_args, global_args);
+    if energy_setting.model == "triangle_spin_J1_Jchi":
+        CTM_cell, double_B_set,double_T_set,ite_num,ite_err=Bosonic_CTMRG_cell_iPESS(B_set,T_set,init,CTM0, ctm_args, global_args)
+    else:
+        CTM_cell, double_B_set,double_T_set,ite_num,ite_err=Fermionic_CTMRG_cell_iPESS(B_set,T_set,init,CTM0, ctm_args, global_args);
     if (ctm_args.doublelayer_on_cpu)&(global_args.device !=double_B_set['1,1'].device) :
         double_B_set=Cell_to_device(double_B_set,global_args.device,global_args);
         double_T_set=Cell_to_device(double_T_set,global_args.device,global_args);
@@ -118,6 +149,18 @@ def cost_fun(parameters,state, ctm_args, energy_setting, global_args, config_kwa
         E_total,  ex_up_set, ey_up_set, e_diagonala_up_set, ex_dn_set, ey_dn_set, e_diagonala_dn_set, e0_set, eU_set, sx_set, sy_set, sz_set=evaluate_ob_cell_iPESS(parameters, B_set,T_set, double_B_set, double_T_set, CTM_cell, energy_setting, config_kwargs, global_args);
     elif energy_setting.model == "triangle_spinlessHofstadter":
         E_total,  ex_set, ey_set, e_diagonala_set, e0_set =evaluate_ob_cell_iPESS(parameters, B_set,T_set, double_B_set, double_T_set, CTM_cell, energy_setting, config_kwargs, global_args);
+    elif energy_setting.model == "triangle_spin_J1_Jchi":
+        E_total=evaluate_triangle_spin_energy(
+            parameters, B_set, T_set, double_B_set, double_T_set,
+            CTM_cell, config_kwargs, global_args
+        )
+    elif energy_setting.model == "triangle_spin_J1_Jchi_fermionic_d2":
+        E_total=evaluate_fermionic_triangle_spin_energy(
+            parameters, B_set, T_set, double_B_set, double_T_set,
+            CTM_cell, config_kwargs, global_args
+        )
+    else:
+        raise ValueError("unknown triangular iPESS model: "+str(energy_setting.model))
     # print(E_total)
     # print(ex_set)
     # print(ey_set)
@@ -208,7 +251,10 @@ def fx(parameters,state, CTM0, ls_ctm_args, energy_setting, global_args, config_
     init=INITCTMARGS()
     init.reconstruct_CTM=False;
     
-    CTM_cell, double_B_set,double_T_set,ite_num,ite_err=Fermionic_CTMRG_cell_iPESS(B_set,T_set,init,CTM0, ls_ctm_args, global_args);
+    if energy_setting.model == "triangle_spin_J1_Jchi":
+        CTM_cell, double_B_set,double_T_set,ite_num,ite_err=Bosonic_CTMRG_cell_iPESS(B_set,T_set,init,CTM0, ls_ctm_args, global_args)
+    else:
+        CTM_cell, double_B_set,double_T_set,ite_num,ite_err=Fermionic_CTMRG_cell_iPESS(B_set,T_set,init,CTM0, ls_ctm_args, global_args);
     print('CTM ite_num='+str(ite_num)+', ite_err='+str(ite_err))
 
     if energy_setting.model=="spinful_triangle_lattice":
@@ -267,6 +313,51 @@ def fx(parameters,state, CTM0, ls_ctm_args, energy_setting, global_args, config_
         print(e_diagonala_set.tolist())
         print('occupation:')
         print(e0_set.tolist())
+
+    elif energy_setting.model == "triangle_spin_J1_Jchi":
+        E_total, observables=evaluate_triangle_spin_energy(
+            parameters, B_set, T_set, double_B_set, double_T_set,
+            CTM_cell, config_kwargs, global_args, return_observables=True
+        )
+        print('E= '+str(E_total.item()))
+        print('scalar chirality (up): '+str(observables['chi_up'].tolist()))
+        print('scalar chirality (down, common orientation): '+str(observables['chi_down'].tolist()))
+        print('S.S x: '+str(observables['SS_x'].tolist()))
+        print('S.S y: '+str(observables['SS_y'].tolist()))
+        print('S.S diagonal: '+str(observables['SS_diagonal'].tolist()))
+        print('magnetization components:')
+        print(observables['Sx'].tolist())
+        print(observables['Sy'].tolist())
+        print(observables['Sz'].tolist())
+        print('total magnetization:')
+        magnetization=torch.sqrt(
+            observables['Sx']**2+observables['Sy']**2+observables['Sz']**2
+        )
+        print(magnetization.tolist())
+
+    elif energy_setting.model == "triangle_spin_J1_Jchi_fermionic_d2":
+        E_total, observables=evaluate_fermionic_triangle_spin_energy(
+            parameters, B_set, T_set, double_B_set, double_T_set,
+            CTM_cell, config_kwargs, global_args, return_observables=True
+        )
+        print('E= '+str(E_total.item()))
+        print('scalar chirality (up): '+str(observables['chi_up'].tolist()))
+        print('scalar chirality (down, common orientation): '+str(observables['chi_down'].tolist()))
+        print('S.S x: '+str(observables['SS_x'].tolist()))
+        print('S.S y: '+str(observables['SS_y'].tolist()))
+        print('S.S diagonal: '+str(observables['SS_diagonal'].tolist()))
+        print('magnetization components:')
+        print(observables['Sx'].tolist())
+        print(observables['Sy'].tolist())
+        print(observables['Sz'].tolist())
+        print('total magnetization:')
+        magnetization=torch.sqrt(
+            observables['Sx']**2+observables['Sy']**2+observables['Sz']**2
+        )
+        print(magnetization.tolist())
+
+    else:
+        raise ValueError("unknown triangular iPESS model: "+str(energy_setting.model))
 
     if return_ctm_err:
         return E_total,ite_err
