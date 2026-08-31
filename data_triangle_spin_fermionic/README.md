@@ -10,6 +10,11 @@ virtual sectors, double layer, and CTMRG.  Its physical leg is exactly
    path, input state, J1, Jchi, D, chi, device, and cell size.
 3. Submit with `bash run_triangle_spin_fermionic_server.sh`.
 
+To evaluate an optimized d=2 state without changing it, edit
+`compute_triangle_spin_observables.py` and submit with
+`bash run_triangle_spin_observables_server.sh`. The observable runner infers
+`Lx`, `Ly`, and the actual virtual bond dimension directly from the JSON.
+
 The optimization file only loads d=2 states. It does not project during an
 optimization step. Accepted line-search steps print both triangle
 chiralities, three bond energies, and Sx/Sy/Sz/total magnetization. Gradient

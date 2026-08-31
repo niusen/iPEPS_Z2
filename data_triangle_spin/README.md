@@ -39,3 +39,16 @@ into the requested dimension with zero padding. The single `Noise` setting is
 then applied to the complete state, exactly as for a state that was not
 expanded. The log prints both the loaded and actual optimization dimensions.
 A loaded state larger than `D` is rejected rather than silently truncated.
+
+To evaluate a saved state without optimization, edit
+`compute_triangle_spin_observables.py` and submit with
+`bash run_triangle_spin_observables_server.sh`. The observable runner infers
+`Lx`, `Ly`, and the actual virtual bond dimension directly from the JSON.
+
+For the momentum-resolved entanglement spectrum, edit
+`compute_triangle_spin_entanglement_spectrum.py` and submit with
+`bash run_ES_2x1.sh`. It prints the J1-Jchi energy and local energy terms
+before the spectrum, checks the iPESS-to-iPEPS double layer, and uses the
+streamed periodic-chi contraction by default. Every Lanczos matrix-vector
+product is flushed to the log as `EH_MATVEC_DONE`, including its sequence
+number, elapsed time, contraction mode, and peak CUDA memory.
