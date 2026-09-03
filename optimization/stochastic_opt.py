@@ -10,6 +10,7 @@ from ansatz.fermionic_spin_triangle_iPESS import (
     save_fermionic_spin_triangle_iPESS,
 )
 from model.bosonic_spin_ob_iPESS import evaluate_triangle_spin_energy
+from model.bosonic_spin_pair_ob_iPESS import TriangleSpinChiralPairModel
 from model.fermionic_spin_ob_iPESS import evaluate_fermionic_triangle_spin_energy
 from config.settings import *
 from config.config import *
@@ -136,7 +137,7 @@ def cost_fun(parameters,state, ctm_args, energy_setting, global_args, config_kwa
     T_set=state.T_set
     init=INITCTMARGS()
     CTM0=None;
-    if energy_setting.model == "triangle_spin_J1_Jchi":
+    if energy_setting.model in ("triangle_spin_J1_Jchi", TriangleSpinChiralPairModel.model_name):
         CTM_cell, double_B_set,double_T_set,ite_num,ite_err=Bosonic_CTMRG_cell_iPESS(B_set,T_set,init,CTM0, ctm_args, global_args)
     else:
         CTM_cell, double_B_set,double_T_set,ite_num,ite_err=Fermionic_CTMRG_cell_iPESS(B_set,T_set,init,CTM0, ctm_args, global_args);
@@ -154,6 +155,13 @@ def cost_fun(parameters,state, ctm_args, energy_setting, global_args, config_kwa
             parameters, B_set, T_set, double_B_set, double_T_set,
             CTM_cell, config_kwargs, global_args
         )
+    elif energy_setting.model == TriangleSpinChiralPairModel.model_name:
+        if not isinstance(getattr(energy_setting, "model_object", None), TriangleSpinChiralPairModel):
+            raise ValueError("energy_setting.model_object must hold the fixed chiral-pair model")
+        E_total=energy_setting.model_object.evaluate(
+            parameters, B_set, T_set, double_B_set, double_T_set,
+            CTM_cell, global_args
+        )
     elif energy_setting.model == "triangle_spin_J1_Jchi_fermionic_d2":
         E_total=evaluate_fermionic_triangle_spin_energy(
             parameters, B_set, T_set, double_B_set, double_T_set,
@@ -167,7 +175,12 @@ def cost_fun(parameters,state, ctm_args, energy_setting, global_args, config_kwa
     # print(e_diagonala_set)
     # print(e0_set)
     # print(eU_set)
-    print('E='+str(E_total.item()))
+    energy_label = (
+        'E (average per layer)'
+        if energy_setting.model == TriangleSpinChiralPairModel.model_name
+        else 'E'
+    )
+    print(energy_label+'='+str(E_total.item()))
     if return_ctm_err:
         return E_total,CTM_cell,ite_err
     return E_total,CTM_cell
@@ -251,7 +264,7 @@ def fx(parameters,state, CTM0, ls_ctm_args, energy_setting, global_args, config_
     init=INITCTMARGS()
     init.reconstruct_CTM=False;
     
-    if energy_setting.model == "triangle_spin_J1_Jchi":
+    if energy_setting.model in ("triangle_spin_J1_Jchi", TriangleSpinChiralPairModel.model_name):
         CTM_cell, double_B_set,double_T_set,ite_num,ite_err=Bosonic_CTMRG_cell_iPESS(B_set,T_set,init,CTM0, ls_ctm_args, global_args)
     else:
         CTM_cell, double_B_set,double_T_set,ite_num,ite_err=Fermionic_CTMRG_cell_iPESS(B_set,T_set,init,CTM0, ls_ctm_args, global_args);
@@ -334,6 +347,34 @@ def fx(parameters,state, CTM0, ls_ctm_args, energy_setting, global_args, config_
             observables['Sx']**2+observables['Sy']**2+observables['Sz']**2
         )
         print(magnetization.tolist())
+
+    elif energy_setting.model == TriangleSpinChiralPairModel.model_name:
+        if not isinstance(getattr(energy_setting, "model_object", None), TriangleSpinChiralPairModel):
+            raise ValueError("energy_setting.model_object must hold the fixed chiral-pair model")
+        E_total, observables=energy_setting.model_object.evaluate(
+            parameters, B_set, T_set, double_B_set, double_T_set,
+            CTM_cell, global_args, return_observables=True
+        )
+        print('E (average per layer)= '+str(E_total.item()))
+        print('E chiral layer= '+str(observables['energy_chiral'].item()))
+        print('E antichiral layer= '+str(observables['energy_antichiral'].item()))
+        for layer in ('chiral', 'antichiral'):
+            print(layer+' scalar chirality (up): '+str(observables['chi_up_'+layer].tolist()))
+            print(layer+' scalar chirality (down, common orientation): '+str(observables['chi_down_'+layer].tolist()))
+            print(layer+' S.S x: '+str(observables['SS_x_'+layer].tolist()))
+            print(layer+' S.S y: '+str(observables['SS_y_'+layer].tolist()))
+            print(layer+' S.S diagonal: '+str(observables['SS_diagonal_'+layer].tolist()))
+            print(layer+' magnetization components:')
+            print(observables['Sx_'+layer].tolist())
+            print(observables['Sy_'+layer].tolist())
+            print(observables['Sz_'+layer].tolist())
+            magnetization=torch.sqrt(
+                observables['Sx_'+layer]**2
+                +observables['Sy_'+layer]**2
+                +observables['Sz_'+layer]**2
+            )
+            print(layer+' total magnetization:')
+            print(magnetization.tolist())
 
     elif energy_setting.model == "triangle_spin_J1_Jchi_fermionic_d2":
         E_total, observables=evaluate_fermionic_triangle_spin_energy(

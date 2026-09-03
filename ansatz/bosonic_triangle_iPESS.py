@@ -202,3 +202,44 @@ def add_bosonic_noise(state, noise):
             tensors[key] = tensor + noise * scale * perturbation
     state.normalize()
     return state
+
+
+def chiral_pair_from_single_bosonic_triangle_iPESS(state, split_unitary):
+    r"""Build ``|psi> x |psi*>`` as a d=4 iPESS with bond dimension D^2.
+
+    ``split_unitary`` has rows labelled by the product basis ``(a,b)`` and
+    columns labelled by the d=4 physical basis.  It is applied once while the
+    product state is constructed; the model must retain the same unitary for
+    all later operator insertions.
+    """
+    unitary = numpy.asarray(split_unitary.detach().cpu() if hasattr(split_unitary, "detach") else split_unitary)
+    if unitary.shape != (4, 4):
+        raise ValueError("split_unitary must be a 4x4 matrix")
+    error = numpy.linalg.norm(unitary.conj().T @ unitary - numpy.eye(4))
+    if error > 1.0e-12:
+        raise ValueError("split_unitary is not unitary")
+
+    B_set = OrderedDict()
+    T_set = OrderedDict()
+    for key in state.B_set:
+        B = numpy.asarray(state.B_set[key].to_dense().to("cpu"))
+        T = numpy.asarray(state.T_set[key].to_dense().to("cpu"))
+        if T.shape[1] != 2:
+            raise ValueError("single-layer iPESS must have physical dimension d=2")
+
+        # Fuse each pair in row-major order.  The physical product index is
+        # q=2*a+b, exactly the ordering used by fixed_d4_to_two_spin_unitary.
+        B_pair = numpy.einsum("lum,abc->laubmc", B, B.conj()).reshape(
+            B.shape[0] ** 2, B.shape[1] ** 2, B.shape[2] ** 2
+        )
+        T_product = numpy.einsum("msrd,ntqe->mnstrqde", T, T.conj()).reshape(
+            T.shape[0] ** 2, 4, T.shape[2] ** 2, T.shape[3] ** 2
+        )
+        # If U maps physical p to product q, amplitudes transform as U^dagger.
+        T_pair = numpy.einsum("pq,mqrd->mprd", unitary.conj().T, T_product)
+        B_set[key] = dense_tensor_from_array(B_pair, state.global_args, (1, 1, -1))
+        T_set[key] = dense_tensor_from_array(T_pair, state.global_args, (1, 1, -1, -1))
+
+    pair_state = IPESS_TRIANGLE_DENSE(B_set, T_set, state.global_args)
+    pair_state.normalize()
+    return pair_state

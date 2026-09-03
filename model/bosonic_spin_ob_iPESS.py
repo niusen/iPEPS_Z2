@@ -38,10 +38,8 @@ def spin_half_components_dense(config_kwargs):
     return Sx, Sy, Sz
 
 
-def spin_half_operators_dense(config_kwargs):
-    """Return factorized S.S and S.(S x S) operators for the 2-state spin space."""
-    Sx, Sy, Sz = spin_half_components_dense(config_kwargs)
-
+def factorized_spin_operators_dense(Sx, Sy, Sz):
+    """Factorize S.S and S.(S x S) for three pre-built spin components."""
     SS = (
         yastn.ncon([Sx, Sx], [[-1, -2], [-3, -4]])
         + yastn.ncon([Sy, Sy], [[-1, -2], [-3, -4]])
@@ -83,6 +81,11 @@ def spin_half_operators_dense(config_kwargs):
         config=chirality.config, legs=chirality_S3.get_legs(axes=0), isdiag=False
     )
     return Sa, Sb, SS_string, chirality_S1, chirality_S2, chirality_S3, string12, string23
+
+
+def spin_half_operators_dense(config_kwargs):
+    """Return factorized S.S and S.(S x S) operators for the 2-state spin space."""
+    return factorized_spin_operators_dense(*spin_half_components_dense(config_kwargs))
 
 
 def evaluate_triangle_spin_energy(
