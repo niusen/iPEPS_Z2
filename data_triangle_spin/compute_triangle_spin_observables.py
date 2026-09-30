@@ -22,7 +22,7 @@ from ansatz.bosonic_triangle_iPESS import (
     bosonic_triangle_iPESS_bond_dimension,
     load_bosonic_triangle_iPESS,
 )
-from ansatz.triangle_iPESS import Cell_to_device
+from ansatz.triangle_iPESS import CTM_to_device, Cell_to_device
 from config.config import CTMARGS, GLOBALARGS, INITCTMARGS
 from ctmrg.CTMRG_unitcell_iPESS import CTMRG_cell_iPESS
 from model.bosonic_spin_ob_iPESS import evaluate_triangle_spin_energy
@@ -48,6 +48,8 @@ chi = 80
 CTM_ite_nums = 100
 CTM_trun_tol = 1.0e-8
 CTM_conv_tol = 1.0e-6
+# This controls CTMRG itself. Keep it False to run the entire CTMRG step on
+# ctm_device. The converged environment is moved afterward for measurements.
 doublelayer_on_cpu = False
 use_sub_checkpoint = False
 
@@ -58,7 +60,8 @@ state_file = "triangle_spin_J1_1_Jchi_0p4_D4_chi40_Lx2_Ly2"
 ########################
 # Runtime parameters
 ########################
-device = "cuda:1"
+ctm_device = "cuda:1"
+observable_device = "cpu"
 default_dtype = "complex128"
 n_cpu = 10
 
@@ -159,7 +162,8 @@ def main():
             "CTM_conv_tol": CTM_conv_tol,
             "doublelayer_on_cpu": doublelayer_on_cpu,
             "use_sub_checkpoint": use_sub_checkpoint,
-            "device": device,
+            "ctm_device": ctm_device,
+            "observable_device": observable_device,
             "default_dtype": default_dtype,
             "n_cpu": n_cpu,
         },
@@ -169,12 +173,13 @@ def main():
     config_kwargs = {
         "backend": "torch",
         "default_dtype": default_dtype,
-        "default_device": device,
+        "default_device": ctm_device,
         "Lx": cell_Lx,
         "Ly": cell_Ly,
     }
     global_args = GLOBALARGS()
-    global_args.Lx, global_args.Ly, global_args.device = cell_Lx, cell_Ly, device
+    global_args.Lx, global_args.Ly = cell_Lx, cell_Ly
+    global_args.device = ctm_device
 
     B_set, T_set = load_bosonic_triangle_iPESS(prefix, config_kwargs)
     state = IPESS_TRIANGLE_DENSE(B_set, T_set, config_kwargs)
@@ -186,7 +191,7 @@ def main():
         )
     print("loaded state bond dimension: D=" + str(actual_D))
     state.require_grad(False)
-    state.to_device(device)
+    state.to_device(ctm_device)
     state.normalize()
 
     ctm_args = CTMARGS()
@@ -208,9 +213,28 @@ def main():
             ctm_args,
             global_args,
         )
-        if doublelayer_on_cpu and device != double_B_set["1,1"].device:
-            double_B_set = Cell_to_device(double_B_set, device, global_args)
-            double_T_set = Cell_to_device(double_T_set, device, global_args)
+        if str(CTM_cell["Cset"]["1,1"]["C1"].device) != observable_device:
+            print(
+                "moving converged CTM environment from "
+                + str(CTM_cell["Cset"]["1,1"]["C1"].device)
+                + " to "
+                + observable_device
+            )
+            CTM_cell = CTM_to_device(CTM_cell, observable_device, global_args)
+        if str(double_B_set["1,1"].device) != observable_device:
+            double_B_set = Cell_to_device(
+                double_B_set, observable_device, global_args
+            )
+        if str(double_T_set["1,1"].device) != observable_device:
+            double_T_set = Cell_to_device(
+                double_T_set, observable_device, global_args
+            )
+        if str(state.B_set["1,1"].device) != observable_device:
+            state.to_device(observable_device)
+        if ctm_device.startswith("cuda") and torch.cuda.is_available():
+            with torch.cuda.device(ctm_device):
+                torch.cuda.empty_cache()
+            print("released cached CUDA memory before CPU observables")
         energy, observables = evaluate_triangle_spin_energy(
             parameters,
             state.B_set,

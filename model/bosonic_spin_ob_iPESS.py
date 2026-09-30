@@ -19,14 +19,19 @@ def _matrix_to_yastn(matrix, config_kwargs):
     config = dense_config(config_kwargs)
     leg_out = yastn.Leg(config, s=1, D=(matrix.shape[0],))
     leg_in = yastn.Leg(config, s=-1, D=(matrix.shape[1],))
-    operator = yastn.zeros(config=config, legs=[leg_out, leg_in])
+    # Keep the same YASTN config as the state while allowing measurements to
+    # run on a different device from CTMRG.
+    operator = yastn.zeros(
+        config=config, legs=[leg_out, leg_in], device=str(matrix.device)
+    )
     operator.set_block(ts=(), val=matrix)
     return operator
 
 
-def spin_half_components_dense(config_kwargs):
+def spin_half_components_dense(config_kwargs, device=None):
     """Return Sx, Sy, Sz for the dense two-state spin-1/2 space."""
-    device = config_kwargs.get("default_device", "cpu")
+    if device is None:
+        device = config_kwargs.get("default_device", "cpu")
     dtype_name = config_kwargs.get("default_dtype", "complex128")
     dtype = torch.complex64 if dtype_name == "complex64" else torch.complex128
     sx = 0.5 * torch.tensor([[0, 1], [1, 0]], dtype=dtype, device=device)
@@ -50,7 +55,12 @@ def factorized_spin_operators_dense(Sx, Sy, Sz):
     )
     Sa = yastn.ncon([u, s], [[-2, -3, 1], [1, -1]])
     Sb = v
-    SS_string = yastn.eye(config=SS.config, legs=Sb.get_legs(axes=0), isdiag=False)
+    SS_string = yastn.eye(
+        config=SS.config,
+        legs=Sb.get_legs(axes=0),
+        isdiag=False,
+        device=str(Sb.device),
+    )
 
     # epsilon_abc S1^a S2^b S3^c = S1 . (S2 x S3)
     xyz = yastn.ncon([Sx, Sy, Sz], [[-1, -4], [-2, -5], [-3, -6]])
@@ -75,17 +85,25 @@ def factorized_spin_operators_dense(Sx, Sy, Sz):
     chirality_S2 = u
     chirality_S3 = yastn.ncon([s, v], [[-1, 1], [1, -2, -3]])
     string12 = yastn.eye(
-        config=chirality.config, legs=chirality_S2.get_legs(axes=0), isdiag=False
+        config=chirality.config,
+        legs=chirality_S2.get_legs(axes=0),
+        isdiag=False,
+        device=str(chirality_S2.device),
     )
     string23 = yastn.eye(
-        config=chirality.config, legs=chirality_S3.get_legs(axes=0), isdiag=False
+        config=chirality.config,
+        legs=chirality_S3.get_legs(axes=0),
+        isdiag=False,
+        device=str(chirality_S3.device),
     )
     return Sa, Sb, SS_string, chirality_S1, chirality_S2, chirality_S3, string12, string23
 
 
-def spin_half_operators_dense(config_kwargs):
+def spin_half_operators_dense(config_kwargs, device=None):
     """Return factorized S.S and S.(S x S) operators for the 2-state spin space."""
-    return factorized_spin_operators_dense(*spin_half_components_dense(config_kwargs))
+    return factorized_spin_operators_dense(
+        *spin_half_components_dense(config_kwargs, device=device)
+    )
 
 
 def evaluate_triangle_spin_energy(
@@ -102,13 +120,16 @@ def evaluate_triangle_spin_energy(
     """Evaluate energy per site for H=J1 sum_<ij> Si.Sj + Jchi sum_triangle chi."""
     J1 = parameters.get("J1", 1.0)
     Jchi = parameters.get("Jchi", parameters.get("J_chi", 0.0))
-    operators = spin_half_operators_dense(config_kwargs)
+    measurement_device = B_set["1,1"].device
+    operators = spin_half_operators_dense(config_kwargs, device=measurement_device)
     Sa, Sb, SS_string, S1, S2, S3, string12, string23 = operators
     Lx, Ly = global_args.Lx, global_args.Ly
     values = {"chi_up": [], "chi_down": [], "SS_x": [], "SS_y": [], "SS_diagonal": []}
     if return_observables:
         values.update({"Sx": [], "Sy": [], "Sz": []})
-        Sx_operator, Sy_operator, Sz_operator = spin_half_components_dense(config_kwargs)
+        Sx_operator, Sy_operator, Sz_operator = spin_half_components_dense(
+            config_kwargs, device=measurement_device
+        )
     energy = 0.0
 
     for cx in range(1, Lx + 1):
