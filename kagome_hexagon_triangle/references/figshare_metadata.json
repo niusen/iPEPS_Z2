@@ -1,0 +1,217 @@
+{
+  "files": [
+    {
+      "id": 70440465,
+      "name": "data_fig_S1a_mag.dat",
+      "size": 179,
+      "is_link_only": false,
+      "download_url": "https://ndownloader.figshare.com/files/70440465",
+      "supplied_md5": "577b1980af9630d529bf619e9b79884c",
+      "computed_md5": "577b1980af9630d529bf619e9b79884c",
+      "mimetype": "text/plain"
+    },
+    {
+      "id": 70440468,
+      "name": "data_fig_S4b_mag_vs_D.dat",
+      "size": 1164,
+      "is_link_only": false,
+      "download_url": "https://ndownloader.figshare.com/files/70440468",
+      "supplied_md5": "fc5e04060af51b388ae80816377e220e",
+      "computed_md5": "fc5e04060af51b388ae80816377e220e",
+      "mimetype": "text/plain"
+    },
+    {
+      "id": 70440471,
+      "name": "data_fig_S1c_mag.dat",
+      "size": 175,
+      "is_link_only": false,
+      "download_url": "https://ndownloader.figshare.com/files/70440471",
+      "supplied_md5": "77aec8aac134aa416743ae6e15b585bb",
+      "computed_md5": "77aec8aac134aa416743ae6e15b585bb",
+      "mimetype": "text/plain"
+    },
+    {
+      "id": 70440474,
+      "name": "data_fig_S4a_energy_vs_D.dat",
+      "size": 184,
+      "is_link_only": false,
+      "download_url": "https://ndownloader.figshare.com/files/70440474",
+      "supplied_md5": "e7b629af7e9468a8f0320b0fbd587474",
+      "computed_md5": "e7b629af7e9468a8f0320b0fbd587474",
+      "mimetype": "text/plain"
+    },
+    {
+      "id": 70440477,
+      "name": "data_fig_S1b_mag.dat",
+      "size": 182,
+      "is_link_only": false,
+      "download_url": "https://ndownloader.figshare.com/files/70440477",
+      "supplied_md5": "b580469a292083c5fb177c7dc1a5bacd",
+      "computed_md5": "b580469a292083c5fb177c7dc1a5bacd",
+      "mimetype": "text/plain"
+    },
+    {
+      "id": 70440480,
+      "name": "data_fig_2a_mag_vs_h_D_9.dat",
+      "size": 1157,
+      "is_link_only": false,
+      "download_url": "https://ndownloader.figshare.com/files/70440480",
+      "supplied_md5": "7a89d1adabaa1eb1df517b8e39098406",
+      "computed_md5": "7a89d1adabaa1eb1df517b8e39098406",
+      "mimetype": "text/plain"
+    },
+    {
+      "id": 70440483,
+      "name": "data_fig_2a_mag_vs_h_D_8.dat",
+      "size": 1174,
+      "is_link_only": false,
+      "download_url": "https://ndownloader.figshare.com/files/70440483",
+      "supplied_md5": "68ed4cd44983ef6cc15e36ec86200125",
+      "computed_md5": "68ed4cd44983ef6cc15e36ec86200125",
+      "mimetype": "text/plain"
+    },
+    {
+      "id": 70440486,
+      "name": "data_fig_2a_mag_vs_h_D_10.dat",
+      "size": 1160,
+      "is_link_only": false,
+      "download_url": "https://ndownloader.figshare.com/files/70440486",
+      "supplied_md5": "330ff12551f26979538f8eaa8ae3b4ea",
+      "computed_md5": "330ff12551f26979538f8eaa8ae3b4ea",
+      "mimetype": "text/plain"
+    },
+    {
+      "id": 70440489,
+      "name": "data_fig_S3_mag_vs_D.dat",
+      "size": 1510,
+      "is_link_only": false,
+      "download_url": "https://ndownloader.figshare.com/files/70440489",
+      "supplied_md5": "5c612a9ea4b72b06e6f4738576011acf",
+      "computed_md5": "5c612a9ea4b72b06e6f4738576011acf",
+      "mimetype": "text/plain"
+    },
+    {
+      "id": 70440492,
+      "name": "data_fig_2b_energy_vs_D.dat",
+      "size": 335,
+      "is_link_only": false,
+      "download_url": "https://ndownloader.figshare.com/files/70440492",
+      "supplied_md5": "9e0fb678ea72578b807a6667fa8cc4f8",
+      "computed_md5": "9e0fb678ea72578b807a6667fa8cc4f8",
+      "mimetype": "text/plain"
+    },
+    {
+      "id": 70440495,
+      "name": "data_fig_S2c_mag.dat",
+      "size": 553,
+      "is_link_only": false,
+      "download_url": "https://ndownloader.figshare.com/files/70440495",
+      "supplied_md5": "edccf7a001efd2b1f1168109af6a70c3",
+      "computed_md5": "edccf7a001efd2b1f1168109af6a70c3",
+      "mimetype": "text/plain"
+    }
+  ],
+  "folder_structure": {
+    "70440465": "Pub_data",
+    "70440468": "Pub_data",
+    "70440471": "Pub_data",
+    "70440474": "Pub_data",
+    "70440477": "Pub_data",
+    "70440480": "Pub_data",
+    "70440483": "Pub_data",
+    "70440486": "Pub_data",
+    "70440489": "Pub_data",
+    "70440492": "Pub_data",
+    "70440495": "Pub_data"
+  },
+  "authors": [
+    {
+      "id": 21541703,
+      "full_name": "Pratyay Ghosh",
+      "first_name": "Pratyay",
+      "last_name": "Ghosh",
+      "is_active": true,
+      "url_name": "Pratyay_Ghosh",
+      "orcid_id": ""
+    },
+    {
+      "id": 22905865,
+      "full_name": "Frédéric Mila",
+      "first_name": "Frédéric",
+      "last_name": "Mila",
+      "is_active": false,
+      "url_name": "_",
+      "orcid_id": ""
+    }
+  ],
+  "custom_fields": [],
+  "figshare_url": "https://figshare.com/articles/dataset/Kagome_Heiseneberg_AFM_1_9_plateau/34731234",
+  "download_disabled": false,
+  "description": "<p dir=\"ltr\">We investigate the 1/9 magnetization plateau of the spin-1/2 kagome Heisenberg antiferromagnet using infinite projected entangled-pair states.</p>",
+  "funding": null,
+  "funding_list": [],
+  "version": 3,
+  "status": "public",
+  "size": 7773,
+  "created_date": "2026-10-25T15:49:55Z",
+  "modified_date": "2026-10-25T15:49:56Z",
+  "is_public": true,
+  "is_confidential": false,
+  "is_metadata_record": false,
+  "confidential_reason": "",
+  "metadata_reason": "",
+  "license": {
+    "value": 1,
+    "name": "CC BY 4.0",
+    "url": "https://creativecommons.org/licenses/by/4.0/"
+  },
+  "tags": [
+    "iPEPS",
+    "kagome antiferromagnetic lattices",
+    "magnetization behavior [<"
+  ],
+  "keywords": [
+    "iPEPS",
+    "kagome antiferromagnetic lattices",
+    "magnetization behavior [<"
+  ],
+  "categories": [
+    {
+      "id": 30181,
+      "title": "Condensed matter physics not elsewhere classified",
+      "parent_id": 30157,
+      "path": "/30082/30157/30181",
+      "source_id": "510499",
+      "taxonomy_id": 100
+    }
+  ],
+  "references": [],
+  "has_linked_file": false,
+  "citation": "Ghosh, Pratyay; Mila, Frédéric (2026). Data: Kagome Heisenberg antiferromagnet 1/9 plateau. figshare. Dataset. https://doi.org/10.6084/m9.figshare.34731234.v3",
+  "related_materials": [],
+  "is_embargoed": false,
+  "embargo_date": null,
+  "embargo_type": null,
+  "embargo_title": "",
+  "embargo_reason": "",
+  "embargo_options": [],
+  "id": 34731234,
+  "title": "Data: Kagome Heisenberg antiferromagnet 1/9 plateau",
+  "doi": "10.6084/m9.figshare.34731234.v3",
+  "handle": "",
+  "url": "https://api.figshare.com/v2/articles/34731234",
+  "published_date": "2026-10-25T15:49:55Z",
+  "thumb": "",
+  "defined_type": 3,
+  "defined_type_name": "dataset",
+  "group_id": null,
+  "url_private_api": "https://api.figshare.com/v2/account/articles/34731234",
+  "url_public_api": "https://api.figshare.com/v2/articles/34731234",
+  "url_private_html": "https://figshare.com/account/articles/34731234",
+  "url_public_html": "https://figshare.com/articles/dataset/Kagome_Heiseneberg_AFM_1_9_plateau/34731234",
+  "timeline": {
+    "posted": "2026-10-25T15:49:55"
+  },
+  "resource_title": null,
+  "resource_doi": null
+}

@@ -1,0 +1,9 @@
+# Server results and local caches are not algorithm source.
+results/
+**/logs/
+**/__pycache__/
+*.pyc
+*.tmp
+# Small, documented reference data and the reproducible initial state.
+!references/*.json
+!server/initial_states/*.json

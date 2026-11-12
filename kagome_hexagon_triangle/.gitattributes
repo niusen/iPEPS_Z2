@@ -1,0 +1,3 @@
+*.sh text eol=lf
+# Preserve the author's downloadable data bytes and their MD5 checksums.
+references/*.dat -text
