@@ -28,6 +28,10 @@ The current three-seed server scan is configured in
 [server/run_independent_random_server.py](server/run_independent_random_server.py).
 From **dmi/server/** run `sh run_independent_random_server.sh`.
 See [server instructions](docs/SERVER_INDEPENDENT_RANDOM.md) for both packages.
+The server saves data only, including **progress.csv** and complete per-point
+JSON/checkpoints; matplotlib is not required there. After downloading results,
+edit paths in **analysis/run_local_report.py** and run
+`python -m kagome_hexagon_triangle.dmi.analysis.run_local_report` on the laptop.
 
 For a single run, edit **server/run.py**, then from the repository root run
 `python -m kagome_hexagon_triangle.dmi.server.run`, or run `sh run.sh` inside

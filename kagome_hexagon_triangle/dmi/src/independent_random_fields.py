@@ -1,7 +1,8 @@
 """Every (D,Dz,h,trial) is a NEW unrestricted complex random ket.
 
 No field continuation, no D continuation, no projected seed. Resume is allowed
-only within the identical field point. All options are in this file.
+only within the identical field point. This numerical job saves data only;
+plotting is a separate laptop task and is never imported here.
 """
 from pathlib import Path
 import itertools,json,hashlib
@@ -9,7 +10,7 @@ import torch
 from .plateau_explore import point
 from .model import load_state
 from .observables import environment,measure
-from ...server.workflow import atomic_json,writer_lock
+from ...server.workflow import atomic_json,writer_lock,write_csv
 
 OPTIONS=dict(dims=[2,3,4],Dz=[.02,.05,.1],fields=[.28,.32,.36,.38,.40,.44,.48],trials=[1,2,3],
     seed_base=202611140000,threads=10,chi=12,ctm_max=100,ctm_tol=1e-6,
@@ -24,6 +25,22 @@ def seed_for(cfg,D,Dz,h,trial):
 
 def folder_for(cfg,D,Dz,h,trial):
     return Path(cfg['out'])/f'D{D}_Dz{Dz:.3f}_random{trial}'/f'h{h:.3f}'
+
+
+def collect(root):
+    """Write scalar progress with no plotting dependencies, including cached points."""
+    keys=('D','Dz','h_physical','trial','seed','energy_total','energy_exchange',
+          'energy_dmi','energy_field','m_normalized','mean_sz','valid_measurement',
+          'ctm_converged','ctm_iterations','ctm_residual','chi','measurement_seconds',
+          'measurement_device','warm_start','measurement_basis','error','recheck_error')
+    rows=[]
+    for p in sorted(Path(root).glob('D*_Dz*_*/*/independent_result.json')):
+        r=json.loads(p.read_text())
+        row={k:r.get(k) for k in keys}
+        row['accepted']=bool(r.get('valid_measurement') and r.get('ctm_converged'))
+        row['source']=str(p)
+        rows.append(row)
+    write_csv(Path(root)/'progress.csv',rows)
 
 
 def recheck(final,raw,cfg,folder):
@@ -56,10 +73,13 @@ def run(cfg=OPTIONS):
             if json.loads(settings.read_text())!=json.loads(json.dumps(cfg)):raise ValueError('Settings changed; choose new out')
         else:atomic_json(settings,cfg)
         atomic_json(root/'plan.json',[dict(D=D,Dz=dz,h=h,trial=t,seed=s) for (D,dz,h,t),s in zip(cases,seeds)])
+        collect(root)
         for (D,Dz,h,trial),seed in zip(cases,seeds):
             folder=folder_for(cfg,D,Dz,h,trial);folder.mkdir(parents=True,exist_ok=True)
             done=folder/'independent_result.json'
-            if done.exists():continue
+            if done.exists():
+                print(f'SKIP saved D={D} Dz={Dz} h={h} random{trial}',flush=True)
+                continue
             manifest=dict(D=D,Dz=Dz,h=h,trial=trial,seed=seed,initialization='fresh independent complex Gaussian',
                 previous_field_source=None,previous_D_source=None,imposed_U1=False,imposed_C3=False)
             p=folder/'initialization.json'
@@ -79,8 +99,7 @@ def run(cfg=OPTIONS):
                 measurement_device=cfg.get('measurement_device','cpu'),
                 m_normalized=r.get('m_normalized',r.get('magnetization_normalized')))
             atomic_json(done,r)
-            from ..analysis.independent_random_report import run as report
-            report(quiet=True,python_root=root,out=root/'analysis')
+            collect(root)
         (root/'COMPLETED.txt').write_text('All independent random field points finished. Inspect measurement validity before drawing phase conclusions.\n')
 
 

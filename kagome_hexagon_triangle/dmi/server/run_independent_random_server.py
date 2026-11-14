@@ -1,4 +1,4 @@
-"""Edit server settings HERE. Every field starts from an independent random ket."""
+"""Edit server settings HERE. Save data only; draw reports later on the laptop."""
 from pathlib import Path
 from ..src.independent_random_fields import OPTIONS,run
 
@@ -14,4 +14,5 @@ if __name__=='__main__':
     for k in ('dims','Dz','fields','trials'):count*=len(SERVER_OPTIONS[k])
     steps=sum(round(tau/dt) for dt,tau in SERVER_OPTIONS['fresh'])
     print(f'{count} independent random field points; {steps} SU steps EACH; CPU SU, measurement='+SERVER_OPTIONS['measurement_device'],flush=True)
+    print('Data only: checkpoints, full observations and progress.csv; no plotting.',flush=True)
     run(SERVER_OPTIONS)

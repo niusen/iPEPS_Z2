@@ -67,11 +67,6 @@ def collect(root):
     for p in Path(root).glob('D*_Dz*_*/*/observables.json'):
         r=json.loads(p.read_text());rows.append({k:v for k,v in r.items() if k not in ('sites','bonds','history')})
     write_csv(Path(root)/'progress.csv',rows)
-    try:
-        from ..analysis.plateau_report import run as update_report
-        update_report(quiet=True)
-    except Exception as exc:
-        print('Report update failed (numerical checkpoints retained):',exc,flush=True)
 
 
 def run(cfg=OPTIONS):

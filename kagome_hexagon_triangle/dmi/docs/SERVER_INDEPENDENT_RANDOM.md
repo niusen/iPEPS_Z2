@@ -40,11 +40,29 @@ result/seed folders are needed.
 
 Output: `kagome_hexagon_triangle/results/DMI_independent_random3_D2_D4_server/`.
 It contains settings, seed plan, per-field initialization records and audits,
-initial/stage/final.pt, full observations and diagnostics. **analysis/** contains
-the auto-updated HTML/PNG, all_points.csv, best_points.csv and site_magnetization.csv.
-All seed results are retained; curves select the lowest energy among accepted
-seeds at each (D,Dz,h), without averaging magnetization across different branches.
+initial/stage/final.pt, full observations and diagnostics, and **progress.csv**.
+The server computes/saves data only. It never imports plotting/report modules
+and does not require matplotlib. All seed results and full site/bond JSON data
+are retained, including failed-measurement diagnostics.
+
+After downloading that results directory to the laptop, edit paths in
+**dmi/analysis/run_local_report.py**, then from the Python repository root run:
+
+```sh
+python -m kagome_hexagon_triangle.dmi.analysis.run_local_report
+```
+
+Only this separate plotting task needs matplotlib. It performs no SU or CTMRG.
+Its **analysis/** output contains HTML/PNG, all_points.csv, best_points.csv and
+site_magnetization.csv. Curves select the lowest energy among accepted seeds
+at each (D,Dz,h), without averaging magnetization across different branches.
 Light markers show other accepted seeds. An incomplete set of trials is provisional.
+
+If an older job stopped with `ModuleNotFoundError: matplotlib` after saving a
+point, update **dmi/src/independent_random_fields.py** and rerun the same .sh.
+Do not change the physics settings or output folder. The saved
+`independent_result.json` point is skipped; it is not evolved/measured again.
+This fix adds no settings keys, so the existing settings.json remains compatible.
 
 ## Pure Julia TensorKit
 
@@ -85,6 +103,9 @@ and own-field resumption in BOTH implementations. Julia additionally regenerates
 the initial B tensor from the recorded seed and checks it after every point;
 Python verifies the saved seed and hashes the initial checkpoint. Raw failures
 are retained. Measurement validity and CTM convergence are separate flags.
+`python -m kagome_hexagon_triangle.dmi.tests.test_data_only_scan` runs a tiny
+D1 regression with plotting imports blocked and a simulated interrupted plan;
+it verifies unchanged saved checkpoints, settings compatibility and CSV resume.
 Some Python remeasurements use explicitly labelled 1e-6 imaginary/face and 1e-5
 chi-stability criteria rather than pretending the original 1e-8 guard passed.
 Skipped/invalid points must not be interpreted as absence of a plateau.
