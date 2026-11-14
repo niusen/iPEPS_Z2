@@ -1,0 +1,7 @@
+__pycache__/
+*.py[cod]
+
+# Runtime data and a historical laptop-only postprocessing helper.
+/data/*
+!/data/README.md
+/tests/finish_plateau_exploration_20261114.ps1
