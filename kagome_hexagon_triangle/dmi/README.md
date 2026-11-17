@@ -27,6 +27,11 @@ dmi/
 The current three-seed server scan is configured in
 [server/run_independent_random_server.py](server/run_independent_random_server.py).
 From **dmi/server/** run `sh run_independent_random_server.sh`.
+The current server settings use D=6,8, twelve nonnegative Dz values from 0 to
+0.7, eleven fields from h=0.28 to 0.64, and three independent random trials
+per point (792 optimizations). CPU SU and cuda:1 CTMRG/observables are retained;
+chi=12, CTMRG max100, tolerance=1e-6. The new D6/D8 output folder preserves
+the earlier D2--4 results. No saved platform state is used.
 See [server instructions](docs/SERVER_INDEPENDENT_RANDOM.md) for both packages.
 The server saves data only, including **progress.csv** and complete per-point
 JSON/checkpoints; matplotlib is not required there. After downloading results,

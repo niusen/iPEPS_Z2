@@ -1,15 +1,24 @@
 # Server jobs: independent random initial state at every magnetic field
 
-Both jobs use J=1, Dz/J=0.02/0.05/0.1, D=2/3/4 and
-h/J=0.28/0.32/0.36/0.38/0.40/0.44/0.48. Each physical point has THREE independent
+The current Python server task uses J=1, D=6,8,
+Dz/J=0,.02,.03,.05,.10,.15,.20,.30,.40,.50,.60,.70, and
+h/J=.28,.32,.36,.38,.40,.44,.48,.52,.56,.60,.64. This physical grid matches the
+new pure-Julia `run_independent_random_D6_D8.jl` task. Python retains its
+27-spin hexagon-triangle ansatz; Julia uses the nine-spin sqrt3 iPESS.
+Only nonnegative Dz is simulated, as requested. The earlier signed scan found
+nearly symmetric results; it does not supply any initial state here.
+Each physical point has THREE independent
 complex Gaussian random kets (`trials=[1,2,3]`), each with its own recorded seed. No U1/spatial C3 projection, no
 neighbor-field state, no previous-D seed, no old plateau state. Own-point stage
 checkpoints may be resumed. Three seeds reduce initialization bias but do not
 guarantee a global minimum. Add seeds near competing branches or field boundaries.
 Old lower-energy states remain useful energy references.
 
-Each job has 63 physical points x 3 seeds = 189 independent optimizations
-(378 across both ansatzes), about three times the single-seed work.
+The current grid has 264 physical points x 3 seeds = **792 independent
+optimizations per ansatz**. The old D=2/3/4 task had 189 optimizations and its
+output is retained. The h upper bound was expanded from .48 to .64 because
+the 1/9 crossing can move toward higher fields at larger Dz. This remains a
+screening grid: it can miss a narrow plateau or a plateau outside the window.
 EVERY trial runs the full five-stage SU schedule:
 dt=(.03,.01,.003,.001,.0005), tau=(40,20,5,2,1), 9000 complete steps.
 There is one final measurement; rejected measurements may have explicit chi
@@ -31,14 +40,21 @@ tol1e-6, including diagnostic remeasurements. Change `measurement_device` to `cp
 The preflight rejects missing CUDA/device1 BEFORE any SU. Exact GPU thin SVD
 uses gesvd, following the existing checked driver convention. No randomized SVD.
 
-Upload/update **kagome_hexagon_triangle source code**, excluding `results/`,
+For an existing server on which the D2--4 random task already ran, update only
+**dmi/server/run_independent_random_server.py**. The .sh and numerical kernels
+are unchanged. No initial-state files are required. This writes a NEW output
+directory; it does not resume the old D2--4 scan or change an already running
+process. An older run requiring the data-only fix described below also needs
+the updated workflow source.
+
+For a first installation, upload/update **kagome_hexagon_triangle source code**, excluding `results/`,
 `logs/`, `dmi/data/`, `__pycache__/` and *.log/*.pid. Keep its original directory structure
 inside the Python repository; the job imports its existing geometry, SU, CTM,
 paper_method and server helpers. Do not upload only the .sh and .py entry files.
 Use the server's existing torch/numpy/opt_einsum environment; no vendor or old
 result/seed folders are needed.
 
-Output: `kagome_hexagon_triangle/results/DMI_independent_random3_D2_D4_server/`.
+Output: `kagome_hexagon_triangle/results/DMI_independent_random3_D6_D8_positive_Dz070_h028_064_server/`.
 It contains settings, seed plan, per-field initialization records and audits,
 initial/stage/final.pt, full observations and diagnostics, and **progress.csv**.
 The server computes/saves data only. It never imports plotting/report modules
@@ -66,7 +82,7 @@ This fix adds no settings keys, so the existing settings.json remains compatible
 
 ## Pure Julia TensorKit
 
-Settings are in
+The original small-D settings are in
 `Kagome/simple_update/multicell/dmi/server/run_independent_random_D2_D4.jl`.
 From that **dmi/server/** directory run **sh run_independent_random_D2_D4.sh**.
 Default CPU throughout, 10 threads, chi12, CTMRG max50, tol1e-6; an unconverged
@@ -86,6 +102,14 @@ Output: parent multicell `results/DMI_independent_random3_D2_D4_20261114/`, with
 plan.json/settings.toml, initialization.toml/audit, initial/stage/final.jld2,
 independent_result.json/.toml, diagnostics and **progress.csv**.
 Julia uses internal h=-h_physical; output magnetization is +2<Sz> like Python.
+
+The new Julia D6/D8 counterpart uses
+`Kagome/simple_update/multicell/dmi/server/run_independent_random_D6_D8.jl/.sh`
+and is documented in that repository's `dmi/docs/RANDOM_D6_D8.md`. Its D/Dz/h
+grid, trial count and five SU stages match the current Python task. Julia uses
+CPU throughout, chi12/max50/tol1e-6 with an existing conditional chi24 recheck;
+Python retains cuda:1 measurements, chi12/max100/tol1e-6 and its own existing
+diagnostic remeasurement workflow. Do not conflate the two CTMRG iteration caps.
 
 Download the results for joint plotting with **dmi/analysis/independent_random_report.py**;
 its run() accepts explicit python_root, julia_root and output paths. Comparing
